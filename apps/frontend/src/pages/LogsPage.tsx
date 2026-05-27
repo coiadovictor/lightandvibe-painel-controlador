@@ -10,7 +10,13 @@ interface LogStats {
   mensagensHumanas: number;
   mensagensIA: number;
   mediaMensagensPorSessao: number;
-  ultimasSessoes: { sessionId: string; totalMensagens: number; ultimaMensagem: string | null }[];
+  ultimasSessoes: {
+    sessionId: string;
+    totalMensagens: number;
+    ultimaMensagem: string | null;
+    telefone: string | null;
+    nomeFuncionario: string | null;
+  }[];
 }
 
 interface LogMessage {
@@ -19,6 +25,7 @@ interface LogMessage {
   tipo: string;
   conteudo: string;
   criadoEm: string;
+  nomeFuncionario: string | null;
 }
 
 function StatCard({
@@ -63,6 +70,12 @@ function fmt(dt: string | null) {
   return new Date(dt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
+function ContactLabel({ nome, telefone, sessionId }: { nome: string | null; telefone: string | null; sessionId: string }) {
+  if (nome) return <span className="font-medium text-ink">{nome}</span>;
+  if (telefone) return <span className="text-ink-muted">{telefone}</span>;
+  return <span className="font-mono text-ink-muted truncate max-w-[150px]" title={sessionId}>{sessionId}</span>;
+}
+
 export function LogsPage() {
   const { data: stats, isLoading: loadingStats } = useQuery<LogStats>({
     queryKey: ['logs-stats'],
@@ -105,9 +118,9 @@ export function LogsPage() {
             {stats?.ultimasSessoes.map(s => (
               <div key={s.sessionId} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
                 <div className="min-w-0">
-                  <p className="text-xs font-mono text-ink truncate max-w-[150px]" title={s.sessionId}>
-                    {s.sessionId}
-                  </p>
+                  <div className="text-xs truncate max-w-[160px]">
+                    <ContactLabel nome={s.nomeFuncionario} telefone={s.telefone} sessionId={s.sessionId} />
+                  </div>
                   <p className="text-[10px] text-ink-muted">{fmt(s.ultimaMensagem)}</p>
                 </div>
                 <span className="ml-2 shrink-0 text-xs font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
@@ -132,7 +145,7 @@ export function LogsPage() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide">Tipo</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide">Sessão</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide">Contato</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide">Conteúdo</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide whitespace-nowrap">Data/Hora</th>
                 </tr>
@@ -144,8 +157,10 @@ export function LogsPage() {
                 {messages?.map(m => (
                   <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-2.5">{typeBadge(m.tipo)}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-ink-muted max-w-[100px] truncate" title={m.sessionId}>
-                      {m.sessionId}
+                    <td className="px-4 py-2.5 text-xs max-w-[130px] truncate" title={m.sessionId}>
+                      {m.nomeFuncionario
+                        ? <span className="font-medium text-ink">{m.nomeFuncionario}</span>
+                        : <span className="font-mono text-ink-muted">{m.sessionId}</span>}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-ink max-w-xs truncate" title={m.conteudo}>
                       {m.conteudo || <span className="text-ink-muted italic">sem conteúdo</span>}

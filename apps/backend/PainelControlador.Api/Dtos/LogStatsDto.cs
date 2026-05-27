@@ -14,7 +14,9 @@ public record LogStatsDto(
 public record SessaoResumoDto(
     string SessionId,
     int TotalMensagens,
-    DateTime? UltimaMensagem
+    DateTime? UltimaMensagem,
+    string? Telefone = null,
+    string? NomeFuncionario = null
 );
 
 public record LogEntryN8nDto(
@@ -22,5 +24,6 @@ public record LogEntryN8nDto(
     string SessionId,
     string Tipo,
     string Conteudo,
-    DateTime CriadoEm
+    DateTime CriadoEm,
+    string? NomeFuncionario = null
 );
