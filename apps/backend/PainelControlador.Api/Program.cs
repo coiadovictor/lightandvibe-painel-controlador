@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using PainelControlador.Api.Configuration;
 using PainelControlador.Api.Middlewares;
 using PainelControlador.Api.Services;
+using N8nOptions = PainelControlador.Api.Configuration.N8nOptions;
 using Serilog;
 
 Env.TraversePath().Load();
@@ -30,6 +31,15 @@ builder.Services.AddCors(o => o.AddPolicy(CorsPolicyName, p =>
     else
         p.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
 }));
+
+// --- N8n Postgres ---
+var n8nOpts = new N8nOptions();
+builder.Configuration.GetSection(N8nOptions.SectionName).Bind(n8nOpts);
+// Fallback: lê direto de env var N8n__ConnectionString
+if (!n8nOpts.IsConfigured)
+    n8nOpts.ConnectionString = builder.Configuration["N8n__ConnectionString"] ?? "";
+builder.Services.AddSingleton(n8nOpts);
+builder.Services.AddScoped<IN8nDbService, N8nDbService>();
 
 // --- Supabase REST ---
 var sbOpts = builder.Configuration.GetSection(SupabaseOptions.SectionName).Get<SupabaseOptions>()
