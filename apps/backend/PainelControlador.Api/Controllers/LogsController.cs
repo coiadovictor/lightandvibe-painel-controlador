@@ -30,10 +30,10 @@ public class LogsController : ControllerBase
     }
 
     [HttpGet("messages")]
-    public async Task<IActionResult> GetMessages([FromQuery] int limit = 100, CancellationToken ct = default)
+    public async Task<IActionResult> GetMessages([FromQuery] int limit = 100, [FromQuery] string? sessionId = null, CancellationToken ct = default)
     {
         if (limit > 500) limit = 500;
-        var messages = await _n8n.GetRecentMessagesAsync(limit, ct);
+        var messages = await _n8n.GetRecentMessagesAsync(limit, ct, sessionId);
         return Ok(messages);
     }
 

@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MessageSquare, Users, Clock, Zap, Bot, User } from 'lucide-react';
+import { MessageSquare, Users, Clock, Zap, Bot, User, X } from 'lucide-react';
 import { api } from '../lib/api';
 
 interface LogStats {
@@ -26,6 +27,11 @@ interface LogMessage {
   conteudo: string;
   criadoEm: string | null;
   nomeFuncionario: string | null;
+}
+
+interface SelectedSession {
+  sessionId: string;
+  label: string; // nome ou telefone
 }
 
 function StatCard({
@@ -70,13 +76,9 @@ function fmt(dt: string | null) {
   return new Date(dt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-function ContactLabel({ nome, telefone, sessionId }: { nome: string | null; telefone: string | null; sessionId: string }) {
-  if (nome) return <span className="font-medium text-ink">{nome}</span>;
-  if (telefone) return <span className="text-ink-muted">{telefone}</span>;
-  return <span className="font-mono text-ink-muted truncate max-w-[150px]" title={sessionId}>{sessionId}</span>;
-}
-
 export function LogsPage() {
+  const [selected, setSelected] = useState<SelectedSession | null>(null);
+
   const { data: stats, isLoading: loadingStats } = useQuery<LogStats>({
     queryKey: ['logs-stats'],
     queryFn: () => api.get<LogStats>('/logs/stats').then(r => r.data),
@@ -84,10 +86,24 @@ export function LogsPage() {
   });
 
   const { data: messages, isLoading: loadingMessages } = useQuery<LogMessage[]>({
-    queryKey: ['logs-messages'],
-    queryFn: () => api.get<LogMessage[]>('/logs/messages?limit=100').then(r => r.data),
-    refetchInterval: 60_000,
+    queryKey: ['logs-messages', selected?.sessionId],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: '200' });
+      if (selected?.sessionId) params.set('sessionId', selected.sessionId);
+      return api.get<LogMessage[]>(`/logs/messages?${params}`).then(r => r.data);
+    },
+    enabled: !!selected,
+    refetchInterval: selected ? 30_000 : false,
   });
+
+  function handleSelectSession(s: LogStats['ultimasSessoes'][0]) {
+    const label = s.nomeFuncionario ?? s.telefone ?? s.sessionId;
+    if (selected?.sessionId === s.sessionId) {
+      setSelected(null);
+    } else {
+      setSelected({ sessionId: s.sessionId, label });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -112,69 +128,91 @@ export function LogsPage() {
           <h2 className="text-sm font-semibold text-ink mb-1">Últimas Sessões</h2>
           <p className="text-xs text-ink-muted mb-4">
             Média: <span className="font-medium text-ink">{stats?.mediaMensagensPorSessao ?? 0} msg/sessão</span>
+            {selected && <span className="ml-2 text-brand-600">· clique para fechar</span>}
           </p>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {loadingStats && <p className="text-xs text-ink-muted">Carregando...</p>}
-            {stats?.ultimasSessoes.map(s => (
-              <div key={s.sessionId} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                <div className="min-w-0">
-                  <div className="text-xs truncate max-w-[160px]">
-                    <ContactLabel nome={s.nomeFuncionario} telefone={s.telefone} sessionId={s.sessionId} />
+            {stats?.ultimasSessoes.map(s => {
+              const label = s.nomeFuncionario ?? s.telefone ?? s.sessionId;
+              const isActive = selected?.sessionId === s.sessionId;
+              return (
+                <button
+                  key={s.sessionId}
+                  onClick={() => handleSelectSession(s)}
+                  className={`w-full flex items-center justify-between py-2 px-2 rounded-lg border transition-colors text-left ${
+                    isActive
+                      ? 'bg-brand-50 border-brand-200'
+                      : 'border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-ink truncate max-w-[160px]">{label}</p>
+                    <p className="text-[10px] text-ink-muted">{fmt(s.ultimaMensagem)}</p>
                   </div>
-                  <p className="text-[10px] text-ink-muted">{fmt(s.ultimaMensagem)}</p>
-                </div>
-                <span className="ml-2 shrink-0 text-xs font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
-                  {s.totalMensagens} msg
-                </span>
-              </div>
-            ))}
+                  <span className={`ml-2 shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    isActive ? 'text-brand-700 bg-brand-100' : 'text-brand-600 bg-brand-50'
+                  }`}>
+                    {s.totalMensagens} msg
+                  </span>
+                </button>
+              );
+            })}
             {!loadingStats && !stats?.ultimasSessoes.length && (
               <p className="text-xs text-ink-muted">Nenhuma sessão encontrada.</p>
             )}
           </div>
         </div>
 
-        {/* Mensagens Recentes */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-ink">Mensagens Recentes</h2>
-            <p className="text-xs text-ink-muted">Últimas 100 mensagens do histórico de chat.</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide">Tipo</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide">Contato</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide">Conteúdo</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide whitespace-nowrap">Data/Hora</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {loadingMessages && (
-                  <tr><td colSpan={4} className="px-4 py-8 text-center text-ink-muted text-xs">Carregando...</td></tr>
-                )}
-                {messages?.map(m => (
-                  <tr key={m.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-2.5">{typeBadge(m.tipo)}</td>
-                    <td className="px-4 py-2.5 text-xs max-w-[130px] truncate" title={m.sessionId}>
-                      {m.nomeFuncionario
-                        ? <span className="font-medium text-ink">{m.nomeFuncionario}</span>
-                        : <span className="font-mono text-ink-muted">{m.sessionId}</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-ink max-w-xs truncate" title={m.conteudo}>
-                      {m.conteudo || <span className="text-ink-muted italic">sem conteúdo</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-ink-muted whitespace-nowrap">{fmt(m.criadoEm)}</td>
+        {/* Painel de mensagens — só aparece quando uma sessão está selecionada */}
+        {selected ? (
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-ink">{selected.label}</h2>
+                <p className="text-xs text-ink-muted">Histórico completo desta conversa</p>
+              </div>
+              <button
+                onClick={() => setSelected(null)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-ink-muted"
+                title="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide">Tipo</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide">Conteúdo</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink-muted uppercase tracking-wide whitespace-nowrap">Data/Hora</th>
                   </tr>
-                ))}
-                {!loadingMessages && !messages?.length && (
-                  <tr><td colSpan={4} className="px-4 py-8 text-center text-ink-muted text-xs">Nenhuma mensagem encontrada.</td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {loadingMessages && (
+                    <tr><td colSpan={3} className="px-4 py-8 text-center text-ink-muted text-xs">Carregando...</td></tr>
+                  )}
+                  {messages?.map(m => (
+                    <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-2.5">{typeBadge(m.tipo)}</td>
+                      <td className="px-4 py-2.5 text-xs text-ink max-w-xs truncate" title={m.conteudo}>
+                        {m.conteudo || <span className="text-ink-muted italic">sem conteúdo</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-ink-muted whitespace-nowrap">{fmt(m.criadoEm)}</td>
+                    </tr>
+                  ))}
+                  {!loadingMessages && !messages?.length && (
+                    <tr><td colSpan={3} className="px-4 py-8 text-center text-ink-muted text-xs">Nenhuma mensagem encontrada.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="lg:col-span-2 bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center min-h-[200px]">
+            <p className="text-sm text-ink-muted">Selecione uma sessão para ver as mensagens</p>
+          </div>
+        )}
       </div>
     </div>
   );

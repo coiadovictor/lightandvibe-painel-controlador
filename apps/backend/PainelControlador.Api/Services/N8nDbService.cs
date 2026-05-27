@@ -7,7 +7,7 @@ namespace PainelControlador.Api.Services;
 public interface IN8nDbService
 {
     Task<LogStatsDto> GetLogStatsAsync(CancellationToken ct);
-    Task<List<LogEntryN8nDto>> GetRecentMessagesAsync(int limit, CancellationToken ct);
+    Task<List<LogEntryN8nDto>> GetRecentMessagesAsync(int limit, CancellationToken ct, string? sessionId = null);
 }
 
 public class N8nDbService : IN8nDbService
@@ -36,24 +36,30 @@ public class N8nDbService : IN8nDbService
             long total = 0, sessoes = 0, hoje = 0, ultimaHora = 0, humanas = 0, ia = 0;
             var rawSessoes = new List<(string SessionId, int Total, DateTime? Ultima)>();
 
+            // Exclui tipo 'tool' de todas as contagens
             await using (var cmd = new NpgsqlCommand(
-                "SELECT COUNT(*) FROM n8n_chat_histories", conn))
+                "SELECT COUNT(*) FROM n8n_chat_histories WHERE message->>'type' != 'tool'", conn))
                 total = (long)(await cmd.ExecuteScalarAsync(ct) ?? 0L);
 
             await using (var cmd = new NpgsqlCommand(
-                "SELECT COUNT(DISTINCT session_id) FROM n8n_chat_histories", conn))
+                "SELECT COUNT(DISTINCT session_id) FROM n8n_chat_histories WHERE message->>'type' != 'tool'", conn))
                 sessoes = (long)(await cmd.ExecuteScalarAsync(ct) ?? 0L);
 
-            // Tabela sem created_at — contagens por data ficam zeradas
-            hoje = 0;
-            ultimaHora = 0;
+            await using (var cmd = new NpgsqlCommand(
+                "SELECT COUNT(*) FROM n8n_chat_histories WHERE message->>'type' != 'tool' AND data >= CURRENT_DATE", conn))
+                hoje = (long)(await cmd.ExecuteScalarAsync(ct) ?? 0L);
+
+            await using (var cmd = new NpgsqlCommand(
+                "SELECT COUNT(*) FROM n8n_chat_histories WHERE message->>'type' != 'tool' AND data >= NOW() - INTERVAL '1 hour'", conn))
+                ultimaHora = (long)(await cmd.ExecuteScalarAsync(ct) ?? 0L);
 
             // Formato n8n: { "type": "human"|"ai", "content": "...", ... }
             await using (var cmd = new NpgsqlCommand(@"
                 SELECT
                     COUNT(*) FILTER (WHERE message->>'type' = 'human') AS humanas,
                     COUNT(*) FILTER (WHERE message->>'type' IN ('ai', 'assistant')) AS ia
-                FROM n8n_chat_histories", conn))
+                FROM n8n_chat_histories
+                WHERE message->>'type' != 'tool'", conn))
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
             {
                 if (await reader.ReadAsync(ct))
@@ -63,13 +69,15 @@ public class N8nDbService : IN8nDbService
                 }
             }
 
-            // Sessões ordenadas pelas mais ativas (sem timestamp disponível)
+            // Sessões ordenadas pela mais recente, excluindo tool
             await using (var cmd = new NpgsqlCommand(@"
                 SELECT session_id,
-                       COUNT(*) AS total
+                       COUNT(*) AS total,
+                       MAX(data) AS ultima
                 FROM n8n_chat_histories
+                WHERE message->>'type' != 'tool'
                 GROUP BY session_id
-                ORDER BY COUNT(*) DESC
+                ORDER BY MAX(data) DESC
                 LIMIT 10", conn))
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
             {
@@ -77,7 +85,8 @@ public class N8nDbService : IN8nDbService
                 {
                     var sid = reader.GetString(0);
                     var tot = (int)reader.GetInt64(1);
-                    rawSessoes.Add((sid, tot, null));
+                    var ult = reader.IsDBNull(2) ? (DateTime?)null : reader.GetDateTime(2);
+                    rawSessoes.Add((sid, tot, ult));
                 }
             }
 
@@ -99,7 +108,7 @@ public class N8nDbService : IN8nDbService
         }
     }
 
-    public async Task<List<LogEntryN8nDto>> GetRecentMessagesAsync(int limit = 100, CancellationToken ct = default)
+    public async Task<List<LogEntryN8nDto>> GetRecentMessagesAsync(int limit = 100, CancellationToken ct = default, string? sessionId = null)
     {
         if (!_opts.IsConfigured) return [];
 
@@ -108,18 +117,31 @@ public class N8nDbService : IN8nDbService
             await using var conn = new NpgsqlConnection(NormalizeCs(_opts.ConnectionString));
             await conn.OpenAsync(ct);
 
-            var rawRows = new List<(string Id, string SessionId, string Tipo, string Conteudo)>();
+            var rawRows = new List<(string Id, string SessionId, string Tipo, string Conteudo, DateTime? Data)>();
 
-            await using var cmd = new NpgsqlCommand(@"
-                SELECT id::text,
-                       session_id,
-                       COALESCE(message->>'type', 'unknown') AS tipo,
-                       COALESCE(message->>'content', '') AS conteudo
-                FROM n8n_chat_histories
-                ORDER BY id DESC
-                LIMIT @limit", conn);
+            var sql = sessionId is null
+                ? @"SELECT id::text, session_id,
+                           COALESCE(message->>'type', 'unknown') AS tipo,
+                           COALESCE(message->>'content', '') AS conteudo,
+                           data
+                    FROM n8n_chat_histories
+                    WHERE message->>'type' != 'tool'
+                    ORDER BY data DESC
+                    LIMIT @limit"
+                : @"SELECT id::text, session_id,
+                           COALESCE(message->>'type', 'unknown') AS tipo,
+                           COALESCE(message->>'content', '') AS conteudo,
+                           data
+                    FROM n8n_chat_histories
+                    WHERE session_id = @sessionId
+                      AND message->>'type' != 'tool'
+                    ORDER BY data ASC
+                    LIMIT @limit";
 
+            await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("limit", limit);
+            if (sessionId is not null)
+                cmd.Parameters.AddWithValue("sessionId", sessionId);
 
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
@@ -128,7 +150,8 @@ public class N8nDbService : IN8nDbService
                     reader.GetString(0),
                     reader.GetString(1),
                     reader.GetString(2),
-                    reader.GetString(3)
+                    reader.GetString(3),
+                    reader.IsDBNull(4) ? null : reader.GetDateTime(4)
                 ));
             }
 
@@ -137,7 +160,7 @@ public class N8nDbService : IN8nDbService
             return rawRows.Select(r =>
             {
                 var (_, nome) = ResolveContact(r.SessionId, phoneMap);
-                return new LogEntryN8nDto(r.Id, r.SessionId, r.Tipo, r.Conteudo, null, nome);
+                return new LogEntryN8nDto(r.Id, r.SessionId, r.Tipo, r.Conteudo, r.Data, nome);
             }).ToList();
         }
         catch (Exception ex)
