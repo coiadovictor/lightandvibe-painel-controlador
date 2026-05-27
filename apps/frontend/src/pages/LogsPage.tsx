@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MessageSquare, Users, Clock, Zap, Bot, User, X } from 'lucide-react';
+import { MessageSquare, Users, Clock, Zap, Bot, User, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '../lib/api';
 
 interface SessaoResumo {
@@ -81,6 +81,15 @@ function fmt(dt: string | null) {
 
 export function LogsPage() {
   const [selected, setSelected] = useState<SelectedSession | null>(null);
+  const [openSectors, setOpenSectors] = useState<Set<string>>(new Set());
+
+  function toggleSetor(setor: string) {
+    setOpenSectors(prev => {
+      const next = new Set(prev);
+      next.has(setor) ? next.delete(setor) : next.add(setor);
+      return next;
+    });
+  }
 
   const { data: stats, isLoading: loadingStats } = useQuery<LogStats>({
     queryKey: ['logs-stats'],
@@ -118,7 +127,7 @@ export function LogsPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="Total Mensagens"   value={loadingStats ? '—' : (stats?.totalMensagens ?? 0).toLocaleString('pt-BR')}      icon={MessageSquare} color="brand"   />
-        <StatCard label="Sessões Únicas"    value={loadingStats ? '—' : (stats?.sessoesUnicas ?? 0).toLocaleString('pt-BR')}       icon={Users}         color="blue"    />
+        <StatCard label="Funcionários que já utilizaram" value={loadingStats ? '—' : (stats?.sessoesUnicas ?? 0).toLocaleString('pt-BR')} icon={Users} color="blue" />
         <StatCard label="Mensagens Hoje"    value={loadingStats ? '—' : (stats?.mensagensHoje ?? 0).toLocaleString('pt-BR')}       icon={Clock}         color="green"   />
         <StatCard label="Última 1h"         value={loadingStats ? '—' : (stats?.mensagensUltimaHora ?? 0).toLocaleString('pt-BR')} icon={Zap}           color="yellow"  />
         <StatCard label="Msgs Usuário"      value={loadingStats ? '—' : (stats?.mensagensHumanas ?? 0).toLocaleString('pt-BR')}    icon={User}          color="neutral" />
@@ -132,46 +141,73 @@ export function LogsPage() {
           <p className="text-xs text-ink-muted mb-4">
             Média: <span className="font-medium text-ink">{stats?.mediaMensagensPorSessao ?? 0} msg/sessão</span>
           </p>
-          <div className="space-y-4">
+          <div className="space-y-2">
             {loadingStats && <p className="text-xs text-ink-muted">Carregando...</p>}
-            {stats?.sessoesPorSetor.map(grupo => (
-              <div key={grupo.setor}>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-ink-muted mb-1 px-1">
-                  {grupo.setor}
-                </p>
-                <div className="space-y-0.5">
-                  {grupo.sessoes.map(s => {
-                    const label = s.nomeFuncionario ?? s.telefone ?? s.sessionId;
-                    const isActive = selected?.sessionId === s.sessionId;
-                    return (
-                      <button
-                        key={s.sessionId}
-                        onClick={() => handleSelectSession(s)}
-                        className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg border transition-colors text-left ${
-                          isActive
-                            ? 'bg-brand-50 border-brand-200'
-                            : 'border-transparent hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-ink truncate max-w-[150px]">{label}</p>
-                          <p className="text-[10px] text-ink-muted">{fmt(s.ultimaMensagem)}</p>
-                        </div>
-                        <span className={`ml-2 shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          isActive ? 'text-brand-700 bg-brand-100' : 'text-brand-600 bg-brand-50'
-                        }`}>
-                          {s.totalMensagens}
-                        </span>
-                      </button>
-                    );
-                  })}
+            {stats?.sessoesPorSetor.map(grupo => {
+              const isOpen = openSectors.has(grupo.setor);
+              return (
+                <div key={grupo.setor}>
+                  <button
+                    onClick={() => toggleSetor(grupo.setor)}
+                    className="w-full flex items-center justify-between py-1.5 px-1 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+                      {grupo.setor}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-ink-muted">{grupo.sessoes.length} sessão(ões)</span>
+                      {isOpen
+                        ? <ChevronDown className="h-3 w-3 text-ink-muted" />
+                        : <ChevronRight className="h-3 w-3 text-ink-muted" />}
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div className="space-y-0.5 mt-0.5">
+                      {grupo.sessoes.map(s => {
+                        const label = s.nomeFuncionario ?? s.telefone ?? s.sessionId;
+                        const isActive = selected?.sessionId === s.sessionId;
+                        return (
+                          <button
+                            key={s.sessionId}
+                            onClick={() => handleSelectSession(s)}
+                            className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg border transition-colors text-left ${
+                              isActive
+                                ? 'bg-brand-50 border-brand-200'
+                                : 'border-transparent hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-ink truncate max-w-[150px]">{label}</p>
+                              <p className="text-[10px] text-ink-muted">{fmt(s.ultimaMensagem)}</p>
+                            </div>
+                            <span className={`ml-2 shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              isActive ? 'text-brand-700 bg-brand-100' : 'text-brand-600 bg-brand-50'
+                            }`}>
+                              {s.totalMensagens}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {!loadingStats && !stats?.sessoesPorSetor.length && (
               <p className="text-xs text-ink-muted">Nenhuma sessão encontrada.</p>
             )}
           </div>
+          {stats && stats.sessoesPorSetor.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-xs text-ink-muted">Total de mensagens</span>
+              <span className="text-xs font-bold text-ink">
+                {stats.sessoesPorSetor
+                  .flatMap(g => g.sessoes)
+                  .reduce((acc, s) => acc + s.totalMensagens, 0)
+                  .toLocaleString('pt-BR')}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Painel de mensagens — só aparece quando uma sessão está selecionada */}
