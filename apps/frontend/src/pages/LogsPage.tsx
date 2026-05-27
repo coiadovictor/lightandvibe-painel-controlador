@@ -24,7 +24,7 @@ interface LogMessage {
   sessionId: string;
   tipo: string;
   conteudo: string;
-  criadoEm: string;
+  criadoEm: string | null;
   nomeFuncionario: string | null;
 }
 

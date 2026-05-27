@@ -24,6 +24,6 @@ public record LogEntryN8nDto(
     string SessionId,
     string Tipo,
     string Conteudo,
-    DateTime CriadoEm,
+    DateTime? CriadoEm,
     string? NomeFuncionario = null
 );
