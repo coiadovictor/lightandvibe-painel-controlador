@@ -66,8 +66,8 @@ public class HollerithService : IHollerithService
                 }
             }
 
-            // 5. Salário — verba 9001 quando presente, senão null
-            decimal? salario = movimentos.FirstOrDefault(m => m.Verba == 9001)?.Valor;
+            // 5. Salário — verba 1014 quando presente, senão null
+            decimal? salario = movimentos.FirstOrDefault(m => m.Verba == 1014)?.Valor;
 
             // 6. Build lines — only tipo 1 (vencimento) and tipo 2 (desconto)
             var linhas = new List<HollerithLinhaDto>();
