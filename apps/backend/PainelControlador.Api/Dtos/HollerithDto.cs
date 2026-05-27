@@ -19,6 +19,7 @@ public record HollerithDto(
     string Cargo,
     string Admissao,
     string Pis,
+    decimal? Salario,
     int Mes,
     int Ano,
     List<HollerithLinhaDto> Linhas,

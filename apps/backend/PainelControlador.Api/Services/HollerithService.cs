@@ -66,7 +66,10 @@ public class HollerithService : IHollerithService
                 }
             }
 
-            // 5. Build lines — only tipo 1 (vencimento) and tipo 2 (desconto)
+            // 5. Salário — verba 9001 quando presente, senão null
+            decimal? salario = movimentos.FirstOrDefault(m => m.Verba == 9001)?.Valor;
+
+            // 6. Build lines — only tipo 1 (vencimento) and tipo 2 (desconto)
             var linhas = new List<HollerithLinhaDto>();
             foreach (var mov in movimentos)
             {
@@ -101,6 +104,7 @@ public class HollerithService : IHollerithService
                 func.Cargo ?? "",
                 func.Admissao ?? "",
                 func.Pis ?? "",
+                salario,
                 mes,
                 ano,
                 linhas,

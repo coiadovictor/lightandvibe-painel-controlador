@@ -25,6 +25,7 @@ export interface HollerithData {
   cargo: string;
   admissao: string;
   pis: string;
+  salario: number | null;
   mes: number;
   ano: number;
   linhas: HollerithLinha[];
@@ -140,11 +141,19 @@ export async function generateHollerithPdf(data: HollerithData): Promise<void> {
     { label: 'Matrícula', value: data.matricula, w: contentW - 160 },
   ]);
 
-  // ID / CARGO
-  infoRow([
-    { label: 'PIS', value: data.pis, w: 40 },
-    { label: 'Cargo', value: data.cargo, w: contentW - 40 },
-  ]);
+  // PIS / CARGO / SALÁRIO (somente se verba 9001 presente)
+  if (data.salario != null) {
+    infoRow([
+      { label: 'PIS', value: data.pis, w: 40 },
+      { label: 'Cargo', value: data.cargo, w: contentW - 40 - 45 },
+      { label: 'Salário', value: `R$ ${fmt(data.salario)}`, w: 45 },
+    ]);
+  } else {
+    infoRow([
+      { label: 'PIS', value: data.pis, w: 40 },
+      { label: 'Cargo', value: data.cargo, w: contentW - 40 },
+    ]);
+  }
 
   y += 2;
 

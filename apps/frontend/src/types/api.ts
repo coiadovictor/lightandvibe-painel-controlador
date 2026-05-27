@@ -52,6 +52,7 @@ export interface HollerithData {
   cargo: string;
   admissao: string;
   pis: string;
+  salario: number | null;
   mes: number;
   ano: number;
   linhas: HollerithLinha[];
