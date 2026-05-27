@@ -54,23 +54,11 @@ public class N8nDbService : IN8nDbService
                 "SELECT COUNT(*) FROM n8n_chat_histories WHERE created_at >= NOW() - INTERVAL '1 hour'", conn))
                 ultimaHora = (long)(await cmd.ExecuteScalarAsync(ct) ?? 0L);
 
-            // Mensagens por tipo — cobre os formatos do n8n:
-            // Formato A: { "type": "human"|"ai", "data": { ... } }
-            // Formato B: { "type": "constructor", "id": [...,"HumanMessage"|"AIMessage"], "kwargs": {...} }
+            // Formato n8n: { "type": "human"|"ai", "content": "...", ... }
             await using (var cmd = new NpgsqlCommand(@"
                 SELECT
-                    COUNT(*) FILTER (WHERE
-                        message->>'type' IN ('human')
-                        OR message->'data'->>'type' = 'human'
-                        OR (message->>'type' = 'constructor'
-                            AND message->'id'->>-1 ILIKE '%human%')
-                    ) AS humanas,
-                    COUNT(*) FILTER (WHERE
-                        message->>'type' IN ('ai', 'assistant')
-                        OR message->'data'->>'type' IN ('ai', 'assistant')
-                        OR (message->>'type' = 'constructor'
-                            AND message->'id'->>-1 ILIKE '%ai%')
-                    ) AS ia
+                    COUNT(*) FILTER (WHERE message->>'type' = 'human') AS humanas,
+                    COUNT(*) FILTER (WHERE message->>'type' IN ('ai', 'assistant')) AS ia
                 FROM n8n_chat_histories", conn))
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
             {
@@ -125,22 +113,8 @@ public class N8nDbService : IN8nDbService
             await using var cmd = new NpgsqlCommand(@"
                 SELECT id::text,
                        session_id,
-                       CASE
-                           WHEN message->>'type' IN ('human','ai','assistant') THEN message->>'type'
-                           WHEN message->'data'->>'type' IS NOT NULL          THEN message->'data'->>'type'
-                           WHEN message->>'type' = 'constructor'
-                                AND message->'id'->>-1 ILIKE '%human%'        THEN 'human'
-                           WHEN message->>'type' = 'constructor'
-                                AND message->'id'->>-1 ILIKE '%ai%'           THEN 'ai'
-                           ELSE COALESCE(message->>'type', 'unknown')
-                       END AS tipo,
-                       COALESCE(
-                           message->'data'->>'content',
-                           message->'kwargs'->>'content',
-                           message->>'content',
-                           message->>'text',
-                           ''
-                       ) AS conteudo,
+                       COALESCE(message->>'type', 'unknown') AS tipo,
+                       COALESCE(message->>'content', '') AS conteudo,
                        created_at
                 FROM n8n_chat_histories
                 ORDER BY created_at DESC
