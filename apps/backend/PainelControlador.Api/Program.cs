@@ -114,6 +114,12 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// Log N8n config status at startup so it appears in EasyPanel logs
+var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+startupLogger.LogInformation("N8n IsConfigured={IsConfigured} | CS={ConnectionString}",
+    n8nOpts.IsConfigured,
+    string.IsNullOrWhiteSpace(n8nOpts.ConnectionString) ? "(empty)" : n8nOpts.ConnectionString[..Math.Min(40, n8nOpts.ConnectionString.Length)] + "…");
+
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseSerilogRequestLogging();
 
