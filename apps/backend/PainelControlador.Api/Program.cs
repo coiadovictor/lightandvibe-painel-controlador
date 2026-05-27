@@ -1,0 +1,124 @@
+using System.Text;
+using DotNetEnv;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using PainelControlador.Api.Configuration;
+using PainelControlador.Api.Middlewares;
+using PainelControlador.Api.Services;
+using Serilog;
+
+Env.TraversePath().Load();
+
+var builder = WebApplication.CreateBuilder(args);
+
+// --- Serilog ---
+builder.Host.UseSerilog((ctx, lc) => lc
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console());
+
+// --- CORS ---
+const string CorsPolicyName = "DefaultCors";
+var corsOpts = new CorsOptions();
+builder.Configuration.GetSection(CorsOptions.SectionName).Bind(corsOpts);
+var allowedOrigins = corsOpts.GetOrigins();
+
+builder.Services.AddCors(o => o.AddPolicy(CorsPolicyName, p =>
+{
+    if (allowedOrigins.Length == 0)
+        p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+    else
+        p.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+}));
+
+// --- Supabase REST ---
+var sbOpts = builder.Configuration.GetSection(SupabaseOptions.SectionName).Get<SupabaseOptions>()
+    ?? new SupabaseOptions();
+
+builder.Services.AddHttpClient<SupabaseRestClient>(client =>
+{
+    client.BaseAddress = new Uri(sbOpts.Url.TrimEnd('/') + "/rest/v1/");
+    client.DefaultRequestHeaders.Add("apikey", sbOpts.Key);
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {sbOpts.Key}");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
+// --- JWT ---
+var jwtOpts = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+    ?? new JwtOptions();
+builder.Services.AddSingleton(jwtOpts);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o =>
+    {
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtOpts.Issuer,
+            ValidAudience = jwtOpts.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOpts.Secret)),
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// --- Health checks ---
+builder.Services.AddHealthChecks();
+
+// --- Services ---
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IInformationTypeService, InformationTypeService>();
+builder.Services.AddScoped<ILogService, LogService>();
+builder.Services.AddScoped<IHollerithService, HollerithService>();
+
+// --- API ---
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+    });
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                    { Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
+var app = builder.Build();
+
+app.UseMiddleware<ExceptionMiddleware>();
+app.UseSerilogRequestLogging();
+
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseCors(CorsPolicyName);
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+app.MapHealthChecks("/api/health/ready");
+
+app.Run();
+
+public partial class Program { }

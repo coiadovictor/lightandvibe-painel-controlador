@@ -1,0 +1,49 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files (NEVER commit)
+.env
+.env.local
+.env.*.local
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# .NET / Backend
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+.vs/
+TestResults/
+*.coverage
+*.coveragexml
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Coverage / Test
+coverage/
+*.lcov
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Vite compiled config
+vite.config.d.ts
+vite.config.js
+
+# Generated PDFs
+*.pdf
