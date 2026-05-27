@@ -59,7 +59,10 @@ public class LogsController : ControllerBase
         {
             try
             {
-                await using var conn = new NpgsqlConnection(_n8nOpts.ConnectionString);
+                var normalizedCs = System.Text.RegularExpressions.Regex.IsMatch(_n8nOpts.ConnectionString, @"^postgres(ql)?://")
+                    ? NormalizeUri(_n8nOpts.ConnectionString)
+                    : _n8nOpts.ConnectionString;
+                await using var conn = new NpgsqlConnection(normalizedCs);
                 await conn.OpenAsync(ct);
                 await using var cmd = new NpgsqlCommand("SELECT COUNT(*) FROM n8n_chat_histories", conn);
                 rowCount = (long)(await cmd.ExecuteScalarAsync(ct) ?? 0L);
@@ -80,6 +83,23 @@ public class LogsController : ControllerBase
             error = connError,
             rowCount,
         });
+    }
+
+    private static string NormalizeUri(string cs)
+    {
+        var uri = new Uri(cs);
+        var userParts = uri.UserInfo.Split(':', 2);
+        var user = userParts[0];
+        var pass = userParts.Length > 1 ? Uri.UnescapeDataString(userParts[1]) : "";
+        var db   = uri.AbsolutePath.TrimStart('/');
+        var sslMode = "Prefer";
+        foreach (var param in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var kv = param.Split('=', 2);
+            if (kv.Length == 2 && kv[0] == "sslmode")
+                sslMode = kv[1] switch { "disable" => "Disable", "require" => "Require", _ => "Prefer" };
+        }
+        return $"Host={uri.Host};Port={uri.Port};Database={db};Username={user};Password={pass};SSL Mode={sslMode};Trust Server Certificate=true";
     }
 
     [HttpGet]

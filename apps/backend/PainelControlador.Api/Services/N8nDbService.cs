@@ -30,7 +30,7 @@ public class N8nDbService : IN8nDbService
 
         try
         {
-            await using var conn = new NpgsqlConnection(_opts.ConnectionString);
+            await using var conn = new NpgsqlConnection(NormalizeCs(_opts.ConnectionString));
             await conn.OpenAsync(ct);
 
             long total = 0, sessoes = 0, hoje = 0, ultimaHora = 0, humanas = 0, ia = 0;
@@ -110,7 +110,7 @@ public class N8nDbService : IN8nDbService
 
         try
         {
-            await using var conn = new NpgsqlConnection(_opts.ConnectionString);
+            await using var conn = new NpgsqlConnection(NormalizeCs(_opts.ConnectionString));
             await conn.OpenAsync(ct);
 
             var rawRows = new List<(string Id, string SessionId, string Tipo, string Conteudo, DateTime CriadoEm)>();
@@ -152,6 +152,29 @@ public class N8nDbService : IN8nDbService
             _logger.LogError(ex, "Erro ao buscar mensagens do banco n8n.");
             return [];
         }
+    }
+
+    // Converte URI postgres:// para formato key=value aceito pelo Npgsql
+    private static string NormalizeCs(string cs)
+    {
+        if (!cs.StartsWith("postgres://") && !cs.StartsWith("postgresql://"))
+            return cs;
+
+        var uri = new Uri(cs);
+        var userParts = uri.UserInfo.Split(':', 2);
+        var user = userParts[0];
+        var pass = userParts.Length > 1 ? Uri.UnescapeDataString(userParts[1]) : "";
+        var db   = uri.AbsolutePath.TrimStart('/');
+
+        var sslMode = "Prefer";
+        foreach (var param in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var kv = param.Split('=', 2);
+            if (kv.Length == 2 && kv[0] == "sslmode")
+                sslMode = kv[1] switch { "disable" => "Disable", "require" => "Require", _ => "Prefer" };
+        }
+
+        return $"Host={uri.Host};Port={uri.Port};Database={db};Username={user};Password={pass};SSL Mode={sslMode};Trust Server Certificate=true";
     }
 
     // Monta dicionário: últimos 11 dígitos do celular → nome do funcionário
