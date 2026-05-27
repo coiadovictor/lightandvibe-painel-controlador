@@ -3,6 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { MessageSquare, Users, Clock, Zap, Bot, User, X } from 'lucide-react';
 import { api } from '../lib/api';
 
+interface SessaoResumo {
+  sessionId: string;
+  totalMensagens: number;
+  ultimaMensagem: string | null;
+  telefone: string | null;
+  nomeFuncionario: string | null;
+  setor: string | null;
+}
+
 interface LogStats {
   totalMensagens: number;
   sessoesUnicas: number;
@@ -11,13 +20,7 @@ interface LogStats {
   mensagensHumanas: number;
   mensagensIA: number;
   mediaMensagensPorSessao: number;
-  ultimasSessoes: {
-    sessionId: string;
-    totalMensagens: number;
-    ultimaMensagem: string | null;
-    telefone: string | null;
-    nomeFuncionario: string | null;
-  }[];
+  sessoesPorSetor: { setor: string; sessoes: SessaoResumo[] }[];
 }
 
 interface LogMessage {
@@ -96,7 +99,7 @@ export function LogsPage() {
     refetchInterval: selected ? 30_000 : false,
   });
 
-  function handleSelectSession(s: LogStats['ultimasSessoes'][0]) {
+  function handleSelectSession(s: SessaoResumo) {
     const label = s.nomeFuncionario ?? s.telefone ?? s.sessionId;
     if (selected?.sessionId === s.sessionId) {
       setSelected(null);
@@ -123,41 +126,49 @@ export function LogsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Últimas Sessões */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-ink mb-1">Últimas Sessões</h2>
+        {/* Sessões por Setor */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 overflow-y-auto max-h-[600px]">
+          <h2 className="text-sm font-semibold text-ink mb-1">Sessões por Setor</h2>
           <p className="text-xs text-ink-muted mb-4">
             Média: <span className="font-medium text-ink">{stats?.mediaMensagensPorSessao ?? 0} msg/sessão</span>
-            {selected && <span className="ml-2 text-brand-600">· clique para fechar</span>}
           </p>
-          <div className="space-y-1">
+          <div className="space-y-4">
             {loadingStats && <p className="text-xs text-ink-muted">Carregando...</p>}
-            {stats?.ultimasSessoes.map(s => {
-              const label = s.nomeFuncionario ?? s.telefone ?? s.sessionId;
-              const isActive = selected?.sessionId === s.sessionId;
-              return (
-                <button
-                  key={s.sessionId}
-                  onClick={() => handleSelectSession(s)}
-                  className={`w-full flex items-center justify-between py-2 px-2 rounded-lg border transition-colors text-left ${
-                    isActive
-                      ? 'bg-brand-50 border-brand-200'
-                      : 'border-transparent hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-ink truncate max-w-[160px]">{label}</p>
-                    <p className="text-[10px] text-ink-muted">{fmt(s.ultimaMensagem)}</p>
-                  </div>
-                  <span className={`ml-2 shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    isActive ? 'text-brand-700 bg-brand-100' : 'text-brand-600 bg-brand-50'
-                  }`}>
-                    {s.totalMensagens} msg
-                  </span>
-                </button>
-              );
-            })}
-            {!loadingStats && !stats?.ultimasSessoes.length && (
+            {stats?.sessoesPorSetor.map(grupo => (
+              <div key={grupo.setor}>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-ink-muted mb-1 px-1">
+                  {grupo.setor}
+                </p>
+                <div className="space-y-0.5">
+                  {grupo.sessoes.map(s => {
+                    const label = s.nomeFuncionario ?? s.telefone ?? s.sessionId;
+                    const isActive = selected?.sessionId === s.sessionId;
+                    return (
+                      <button
+                        key={s.sessionId}
+                        onClick={() => handleSelectSession(s)}
+                        className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg border transition-colors text-left ${
+                          isActive
+                            ? 'bg-brand-50 border-brand-200'
+                            : 'border-transparent hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-ink truncate max-w-[150px]">{label}</p>
+                          <p className="text-[10px] text-ink-muted">{fmt(s.ultimaMensagem)}</p>
+                        </div>
+                        <span className={`ml-2 shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          isActive ? 'text-brand-700 bg-brand-100' : 'text-brand-600 bg-brand-50'
+                        }`}>
+                          {s.totalMensagens}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {!loadingStats && !stats?.sessoesPorSetor.length && (
               <p className="text-xs text-ink-muted">Nenhuma sessão encontrada.</p>
             )}
           </div>

@@ -6,5 +6,6 @@ public record EmployeeDto(
     string? Email,
     string? Department,
     string? Phone,
-    DateTime? LastContactAt
+    DateTime? LastContactAt,
+    string? Setor = null
 );

@@ -43,7 +43,8 @@ public class EmployeeService : IEmployeeService
                         Email: func?.EmailContato,
                         Department: func?.Departamento,
                         Phone: last.Celular,
-                        LastContactAt: last.UltimoContato
+                        LastContactAt: last.UltimoContato,
+                        Setor: func?.Setor
                     );
                 })
                 .OrderByDescending(e => e.LastContactAt)
@@ -75,6 +76,7 @@ public class EmployeeService : IEmployeeService
         [property: JsonPropertyName("funcionario")] string Funcionario,
         [property: JsonPropertyName("nome")] string? Nome,
         [property: JsonPropertyName("emailcontato")] string? EmailContato,
-        [property: JsonPropertyName("departamento")] string? Departamento
+        [property: JsonPropertyName("departamento")] string? Departamento,
+        [property: JsonPropertyName("setor")] string? Setor
     );
 }

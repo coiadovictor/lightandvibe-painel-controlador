@@ -8,7 +8,12 @@ public record LogStatsDto(
     long MensagensHumanas,
     long MensagensIA,
     double MediaMensagensPorSessao,
-    List<SessaoResumoDto> UltimasSessoes
+    List<SetorSessionsDto> SessoesPorSetor
+);
+
+public record SetorSessionsDto(
+    string Setor,
+    List<SessaoResumoDto> Sessoes
 );
 
 public record SessaoResumoDto(
@@ -16,7 +21,8 @@ public record SessaoResumoDto(
     int TotalMensagens,
     DateTime? UltimaMensagem,
     string? Telefone = null,
-    string? NomeFuncionario = null
+    string? NomeFuncionario = null,
+    string? Setor = null
 );
 
 public record LogEntryN8nDto(

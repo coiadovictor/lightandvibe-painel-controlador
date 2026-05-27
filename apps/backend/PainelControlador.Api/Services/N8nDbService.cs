@@ -35,6 +35,7 @@ public class N8nDbService : IN8nDbService
 
             long total = 0, sessoes = 0, hoje = 0, ultimaHora = 0, humanas = 0, ia = 0;
             var rawSessoes = new List<(string SessionId, int Total, DateTime? Ultima)>();
+            // Busca TODAS as sessões para agrupar por setor
 
             // Exclui tipo 'tool' de todas as contagens
             await using (var cmd = new NpgsqlCommand(
@@ -69,7 +70,7 @@ public class N8nDbService : IN8nDbService
                 }
             }
 
-            // Sessões ordenadas pela mais recente, excluindo tool
+            // Todas as sessões, ordenadas pela mais recente, excluindo tool
             await using (var cmd = new NpgsqlCommand(@"
                 SELECT session_id,
                        COUNT(*) AS total,
@@ -77,8 +78,7 @@ public class N8nDbService : IN8nDbService
                 FROM n8n_chat_histories
                 WHERE message->>'type' != 'tool'
                 GROUP BY session_id
-                ORDER BY MAX(data) DESC
-                LIMIT 10", conn))
+                ORDER BY MAX(data) DESC", conn))
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
             {
                 while (await reader.ReadAsync(ct))
@@ -92,14 +92,19 @@ public class N8nDbService : IN8nDbService
 
             var phoneMap = await BuildPhoneMapAsync(ct);
 
-            var ultimasSessoes = rawSessoes.Select(s =>
-            {
-                var (tel, nome) = ResolveContact(s.SessionId, phoneMap);
-                return new SessaoResumoDto(s.SessionId, s.Total, s.Ultima, tel, nome);
-            }).ToList();
+            var sessoesPorSetor = rawSessoes
+                .Select(s =>
+                {
+                    var (tel, nome, setor) = ResolveContact(s.SessionId, phoneMap);
+                    return new SessaoResumoDto(s.SessionId, s.Total, s.Ultima, tel, nome, setor);
+                })
+                .GroupBy(s => s.Setor ?? "Sem Setor")
+                .OrderBy(g => g.Key == "Sem Setor" ? "ZZZ" : g.Key)
+                .Select(g => new SetorSessionsDto(g.Key, g.ToList()))
+                .ToList();
 
             var media = sessoes > 0 ? Math.Round((double)total / sessoes, 1) : 0;
-            return new LogStatsDto(total, sessoes, hoje, ultimaHora, humanas, ia, media, ultimasSessoes);
+            return new LogStatsDto(total, sessoes, hoje, ultimaHora, humanas, ia, media, sessoesPorSetor);
         }
         catch (Exception ex)
         {
@@ -135,7 +140,7 @@ public class N8nDbService : IN8nDbService
                     FROM n8n_chat_histories
                     WHERE session_id = @sessionId
                       AND message->>'type' != 'tool'
-                    ORDER BY data ASC
+                    ORDER BY data DESC
                     LIMIT @limit";
 
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -159,7 +164,7 @@ public class N8nDbService : IN8nDbService
 
             return rawRows.Select(r =>
             {
-                var (_, nome) = ResolveContact(r.SessionId, phoneMap);
+                var (_, nome, _) = ResolveContact(r.SessionId, phoneMap);
                 return new LogEntryN8nDto(r.Id, r.SessionId, r.Tipo, r.Conteudo, r.Data, nome);
             }).ToList();
         }
@@ -193,20 +198,20 @@ public class N8nDbService : IN8nDbService
         return $"Host={uri.Host};Port={uri.Port};Database={db};Username={user};Password={pass};SSL Mode={sslMode};Trust Server Certificate=true";
     }
 
-    // Monta dicionário: últimos 11 dígitos do celular → nome do funcionário
-    private async Task<Dictionary<string, string>> BuildPhoneMapAsync(CancellationToken ct)
+    // Monta dicionário: últimos 11 dígitos do celular → (nome, setor)
+    private async Task<Dictionary<string, (string Name, string? Setor)>> BuildPhoneMapAsync(CancellationToken ct)
     {
         try
         {
             var lista = await _employees.ListAsync(ct);
             return lista
                 .Where(e => !string.IsNullOrWhiteSpace(e.Phone) && !string.IsNullOrWhiteSpace(e.Name))
-                .Select(e => (Digits: OnlyDigits(e.Phone!), Name: e.Name))
+                .Select(e => (Digits: OnlyDigits(e.Phone!), e.Name, e.Setor))
                 .Where(x => x.Digits.Length >= 8)
-                .DistinctBy(x => x.Digits[^11..])
+                .DistinctBy(x => x.Digits.Length >= 11 ? x.Digits[^11..] : x.Digits)
                 .ToDictionary(
                     x => x.Digits.Length >= 11 ? x.Digits[^11..] : x.Digits,
-                    x => x.Name
+                    x => (x.Name, x.Setor)
                 );
         }
         catch
@@ -215,29 +220,23 @@ public class N8nDbService : IN8nDbService
         }
     }
 
-    // Extrai telefone e nome a partir do session_id
-    // session_id formato WhatsApp n8n: "5511987654321" ou "5511987654321@s.whatsapp.net" ou variações
-    private static (string? Telefone, string? NomeFuncionario) ResolveContact(
-        string sessionId, Dictionary<string, string> phoneMap)
+    // Extrai telefone, nome e setor a partir do session_id
+    private static (string? Telefone, string? NomeFuncionario, string? Setor) ResolveContact(
+        string sessionId, Dictionary<string, (string Name, string? Setor)> phoneMap)
     {
         var digits = OnlyDigits(sessionId);
-        if (digits.Length < 8) return (null, null);
+        if (digits.Length < 8) return (null, null, null);
 
-        // Tenta match pelo sufixo de 11 dígitos (DDD + número BR) ou 8 (número sem DDD)
         foreach (var len in new[] { 11, 10, 8 })
         {
             if (digits.Length < len) continue;
             var suffix = digits[^len..];
-            if (phoneMap.TryGetValue(suffix, out var nome))
-            {
-                var tel = FormatPhone(digits);
-                return (tel, nome);
-            }
+            if (phoneMap.TryGetValue(suffix, out var info))
+                return (FormatPhone(digits), info.Name, info.Setor);
         }
 
-        // Nenhum match — retorna só o telefone formatado
         var formattedTel = digits.Length >= 10 ? FormatPhone(digits) : null;
-        return (formattedTel, null);
+        return (formattedTel, null, null);
     }
 
     private static string OnlyDigits(string s)
