@@ -51,7 +51,38 @@ public class FichaRegistroService : IFichaRegistroService
                 }
             }
 
-            // 3. Celular via pag_funcionario_acesso
+            // 3. Dados pessoais complementares — pag_funcionario e fat_destinatario_pfisica em paralelo
+            PagFuncionarioRow? pagFunc = null;
+            FatPfisicaRow? pfisica = null;
+            try
+            {
+                var pagFuncTask = _sb.GetAsync<PagFuncionarioRow>(
+                    "pag_funcionario", $"funcionario=eq.{Uri.EscapeDataString(matricula)}&select=*", ct);
+                var pfisicaTask = _sb.GetAsync<FatPfisicaRow>(
+                    "fat_destinatario_pfisica", $"funcionario=eq.{Uri.EscapeDataString(matricula)}&select=*", ct);
+
+                await Task.WhenAll(pagFuncTask, pfisicaTask);
+
+                pagFunc = (await pagFuncTask).FirstOrDefault();
+                pfisica = (await pfisicaTask).FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Dados complementares não disponíveis para {Matricula}.", matricula);
+                // tenta pag_funcionario individualmente se a outra falhou
+                if (pagFunc is null)
+                {
+                    try
+                    {
+                        var rows = await _sb.GetAsync<PagFuncionarioRow>(
+                            "pag_funcionario", $"funcionario=eq.{Uri.EscapeDataString(matricula)}&select=*", ct);
+                        pagFunc = rows.FirstOrDefault();
+                    }
+                    catch { /* silencioso */ }
+                }
+            }
+
+            // 4. Celular via pag_funcionario_acesso
             string? celular = null;
             try
             {
@@ -64,7 +95,7 @@ public class FichaRegistroService : IFichaRegistroService
                 _logger.LogDebug(ex, "Celular não disponível para {Matricula}.", matricula);
             }
 
-            // 4. Histórico salarial derivado de pag_movimento_hist (verba 1014)
+            // 5. Histórico salarial derivado de pag_movimento_hist (verba 1014)
             var alteracoesSalariais = new List<AlteracaoSalarialDto>();
             try
             {
@@ -88,7 +119,7 @@ public class FichaRegistroService : IFichaRegistroService
                 _logger.LogDebug(ex, "Histórico salarial não disponível para {Matricula}.", matricula);
             }
 
-            // 5. Histórico de cargo
+            // 6. Histórico de cargo
             var alteracoesCargo = new List<AlteracaoCargoDto>();
             try
             {
@@ -109,7 +140,7 @@ public class FichaRegistroService : IFichaRegistroService
                 _logger.LogDebug(ex, "Histórico de cargo não disponível para {Matricula}.", matricula);
             }
 
-            // 6. Registros de férias
+            // 7. Registros de férias
             var ferias = new List<FeriasDto>();
             try
             {
@@ -131,7 +162,7 @@ public class FichaRegistroService : IFichaRegistroService
                 _logger.LogDebug(ex, "Férias não disponíveis para {Matricula}.", matricula);
             }
 
-            // 7. Registros de afastamento
+            // 8. Registros de afastamento
             var afastamentos = new List<AfastamentoDto>();
             try
             {
@@ -151,6 +182,10 @@ public class FichaRegistroService : IFichaRegistroService
                 _logger.LogDebug(ex, "Afastamentos não disponíveis para {Matricula}.", matricula);
             }
 
+            // Merge: view_func → pag_funcionario → fat_destinatario_pfisica
+            string? Merge(string? a, string? b, string? c = null)
+                => NullIfEmpty(a) ?? NullIfEmpty(b) ?? NullIfEmpty(c);
+
             return new FichaRegistroDto(
                 empresa,
                 cnpjEmpresa,
@@ -160,29 +195,29 @@ public class FichaRegistroService : IFichaRegistroService
                 ufEmpresa,
                 cnaeEmpresa,
                 matricula,
-                func.Nome ?? "",
-                FormatCpf(func.Cpf ?? ""),
-                func.Pis,
-                FormatDate(func.Nascimento),
-                func.Sexo,
-                func.EstadoCivil,
-                func.Nacionalidade,
-                func.NomeMae,
-                func.NomePai,
-                func.GrauInstrucao,
-                func.Endereco,
-                func.Bairro,
-                func.Cep,
-                func.Municipio,
-                func.Uf,
-                func.Rg,
-                func.RgOrgao,
-                FormatDate(func.RgExpedicao),
-                func.RgUf,
-                func.Ctps,
-                func.CtpsSerie,
-                FormatDate(func.CtpsExpedicao),
-                func.CtpsUf,
+                func.Nome ?? pagFunc?.Nome ?? "",
+                FormatCpf(Merge(func.Cpf, pagFunc?.Cpf, pfisica?.Cpf) ?? ""),
+                Merge(func.Pis, pagFunc?.Pis),
+                FormatDate(Merge(func.Nascimento, pagFunc?.Nascimento, pfisica?.Nascimento)),
+                Merge(func.Sexo, pagFunc?.Sexo, pfisica?.Sexo),
+                Merge(func.EstadoCivil, pagFunc?.EstadoCivil, pfisica?.EstadoCivil),
+                Merge(func.Nacionalidade, pagFunc?.Nacionalidade, pfisica?.Nacionalidade),
+                Merge(func.NomeMae, pagFunc?.NomeMae, pfisica?.NomeMae),
+                Merge(func.NomePai, pagFunc?.NomePai, pfisica?.NomePai),
+                Merge(func.GrauInstrucao, pagFunc?.GrauInstrucao, pfisica?.GrauInstrucao),
+                Merge(func.Endereco, pagFunc?.Endereco, pfisica?.Endereco),
+                Merge(func.Bairro, pagFunc?.Bairro, pfisica?.Bairro),
+                Merge(func.Cep, pagFunc?.Cep, pfisica?.Cep),
+                Merge(func.Municipio, pagFunc?.Municipio, pfisica?.Municipio),
+                Merge(func.Uf, pagFunc?.Uf, pfisica?.Uf),
+                Merge(func.Rg, pagFunc?.Rg, pfisica?.Rg),
+                Merge(func.RgOrgao, pagFunc?.RgOrgao, pfisica?.RgOrgao),
+                FormatDate(Merge(func.RgExpedicao, pagFunc?.RgExpedicao, pfisica?.RgExpedicao)),
+                Merge(func.RgUf, pagFunc?.RgUf, pfisica?.RgUf),
+                Merge(func.Ctps, pagFunc?.Ctps, pfisica?.Ctps),
+                Merge(func.CtpsSerie, pagFunc?.CtpsSerie, pfisica?.CtpsSerie),
+                FormatDate(Merge(func.CtpsExpedicao, pagFunc?.CtpsExpedicao, pfisica?.CtpsExpedicao)),
+                Merge(func.CtpsUf, pagFunc?.CtpsUf, pfisica?.CtpsUf),
                 func.Cargo,
                 func.CboEsocial,
                 func.Departamento ?? func.Diretoria,
@@ -191,8 +226,8 @@ public class FichaRegistroService : IFichaRegistroService
                 FormatDate(func.Desligamento),
                 func.Salario,
                 func.HorasMensais?.ToString(),
-                func.Sindicato,
-                func.FormaRemuneracao,
+                Merge(func.Sindicato, pagFunc?.Sindicato),
+                Merge(func.FormaRemuneracao, pagFunc?.FormaRemuneracao),
                 func.EmailContato,
                 celular,
                 alteracoesCargo,
@@ -209,6 +244,9 @@ public class FichaRegistroService : IFichaRegistroService
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────────
+
+    private static string? NullIfEmpty(string? s)
+        => string.IsNullOrWhiteSpace(s) ? null : s;
 
     private static string FormatCpf(string cpf)
     {
@@ -332,5 +370,61 @@ public class FichaRegistroService : IFichaRegistroService
         [property: JsonPropertyName("data_fim")] string? DataFim,
         [property: JsonPropertyName("motivo")] string? Motivo,
         [property: JsonPropertyName("qtd_dias")] int? QtdDias
+    );
+
+    // Dados pessoais diretos da tabela pag_funcionario
+    private record PagFuncionarioRow(
+        [property: JsonPropertyName("funcionario")] string? Funcionario,
+        [property: JsonPropertyName("nome")] string? Nome,
+        [property: JsonPropertyName("cpf")] string? Cpf,
+        [property: JsonPropertyName("pis")] string? Pis,
+        [property: JsonPropertyName("nascimento")] string? Nascimento,
+        [property: JsonPropertyName("sexo")] string? Sexo,
+        [property: JsonPropertyName("estadocivil")] string? EstadoCivil,
+        [property: JsonPropertyName("nacionalidade")] string? Nacionalidade,
+        [property: JsonPropertyName("nomemae")] string? NomeMae,
+        [property: JsonPropertyName("nomepai")] string? NomePai,
+        [property: JsonPropertyName("grauinstrucao")] string? GrauInstrucao,
+        [property: JsonPropertyName("endereco")] string? Endereco,
+        [property: JsonPropertyName("bairro")] string? Bairro,
+        [property: JsonPropertyName("cep")] string? Cep,
+        [property: JsonPropertyName("municipio")] string? Municipio,
+        [property: JsonPropertyName("uf")] string? Uf,
+        [property: JsonPropertyName("rg")] string? Rg,
+        [property: JsonPropertyName("rgorgao")] string? RgOrgao,
+        [property: JsonPropertyName("rgexpedicao")] string? RgExpedicao,
+        [property: JsonPropertyName("rguf")] string? RgUf,
+        [property: JsonPropertyName("ctps")] string? Ctps,
+        [property: JsonPropertyName("ctpsserie")] string? CtpsSerie,
+        [property: JsonPropertyName("ctpsexpedicao")] string? CtpsExpedicao,
+        [property: JsonPropertyName("ctpsuf")] string? CtpsUf,
+        [property: JsonPropertyName("sindicato")] string? Sindicato,
+        [property: JsonPropertyName("formaremuneracao")] string? FormaRemuneracao
+    );
+
+    // Dados pessoais complementares de fat_destinatario_pfisica
+    private record FatPfisicaRow(
+        [property: JsonPropertyName("funcionario")] string? Funcionario,
+        [property: JsonPropertyName("cpf")] string? Cpf,
+        [property: JsonPropertyName("nascimento")] string? Nascimento,
+        [property: JsonPropertyName("sexo")] string? Sexo,
+        [property: JsonPropertyName("estadocivil")] string? EstadoCivil,
+        [property: JsonPropertyName("nacionalidade")] string? Nacionalidade,
+        [property: JsonPropertyName("nomemae")] string? NomeMae,
+        [property: JsonPropertyName("nomepai")] string? NomePai,
+        [property: JsonPropertyName("grauinstrucao")] string? GrauInstrucao,
+        [property: JsonPropertyName("endereco")] string? Endereco,
+        [property: JsonPropertyName("bairro")] string? Bairro,
+        [property: JsonPropertyName("cep")] string? Cep,
+        [property: JsonPropertyName("municipio")] string? Municipio,
+        [property: JsonPropertyName("uf")] string? Uf,
+        [property: JsonPropertyName("rg")] string? Rg,
+        [property: JsonPropertyName("rgorgao")] string? RgOrgao,
+        [property: JsonPropertyName("rgexpedicao")] string? RgExpedicao,
+        [property: JsonPropertyName("rguf")] string? RgUf,
+        [property: JsonPropertyName("ctps")] string? Ctps,
+        [property: JsonPropertyName("ctpsserie")] string? CtpsSerie,
+        [property: JsonPropertyName("ctpsexpedicao")] string? CtpsExpedicao,
+        [property: JsonPropertyName("ctpsuf")] string? CtpsUf
     );
 }
