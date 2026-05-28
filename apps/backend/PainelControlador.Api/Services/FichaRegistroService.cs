@@ -229,7 +229,7 @@ public class FichaRegistroService : IFichaRegistroService
                 Merge(func.Sindicato, pagFunc?.Sindicato),
                 Merge(func.FormaRemuneracao, pagFunc?.FormaRemuneracao),
                 func.EmailContato,
-                celular,
+                FormatCelular(celular),
                 alteracoesCargo,
                 alteracoesSalariais,
                 ferias,
@@ -247,6 +247,23 @@ public class FichaRegistroService : IFichaRegistroService
 
     private static string? NullIfEmpty(string? s)
         => string.IsNullOrWhiteSpace(s) ? null : s;
+
+    // Remove sufixo WhatsApp (@s.whatsapp.net), extrai dígitos, remove DDI 55 e formata
+    private static string? FormatCelular(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var atIdx = raw.IndexOf('@');
+        var clean = atIdx >= 0 ? raw[..atIdx] : raw;
+        var digits = new string(clean.Where(char.IsDigit).ToArray());
+        if (digits.Length == 0) return null;
+        if (digits.Length == 13 && digits.StartsWith("55")) digits = digits[2..];
+        if (digits.Length == 12 && digits.StartsWith("55")) digits = digits[2..];
+        return digits.Length == 11
+            ? $"({digits[..2]}) {digits[2..7]}-{digits[7..]}"
+            : digits.Length == 10
+                ? $"({digits[..2]}) {digits[2..6]}-{digits[6..]}"
+                : digits;
+    }
 
     private static string FormatCpf(string cpf)
     {
