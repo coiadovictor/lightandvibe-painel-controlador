@@ -85,6 +85,7 @@ builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IInformationTypeService, InformationTypeService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IHollerithService, HollerithService>();
+builder.Services.AddScoped<IFichaRegistroService, FichaRegistroService>();
 
 // --- API ---
 builder.Services.AddControllers();

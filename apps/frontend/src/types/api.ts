@@ -61,6 +61,84 @@ export interface HollerithData {
   liquido: number;
 }
 
+export interface AlteracaoCargo {
+  data: string;
+  cargo: string;
+  motivo: string | null;
+  cboEsocial: string | null;
+}
+
+export interface AlteracaoSalarial {
+  data: string;
+  salario: number;
+  indice: number | null;
+  motivo: string | null;
+}
+
+export interface Ferias {
+  periodoAquisitivo: string;
+  periodoGozo: string | null;
+  diasGozo: number | null;
+  diasAbono: number | null;
+  diasLicenca: number | null;
+}
+
+export interface Afastamento {
+  periodo: string;
+  afastamento: string | null;
+  qtdDias: number | null;
+}
+
+export interface FichaRegistro {
+  empresa: string;
+  cnpjEmpresa: string | null;
+  enderecoEmpresa: string | null;
+  bairroEmpresa: string | null;
+  municipioEmpresa: string | null;
+  ufEmpresa: string | null;
+  cnaeEmpresa: string | null;
+  matricula: string;
+  nome: string;
+  cpf: string | null;
+  pis: string | null;
+  nascimento: string | null;
+  sexo: string | null;
+  estadoCivil: string | null;
+  nacionalidade: string | null;
+  nomeMae: string | null;
+  nomePai: string | null;
+  grauInstrucao: string | null;
+  endereco: string | null;
+  bairro: string | null;
+  cep: string | null;
+  municipio: string | null;
+  uf: string | null;
+  rg: string | null;
+  rgOrgao: string | null;
+  rgExpedicao: string | null;
+  rgUf: string | null;
+  ctps: string | null;
+  ctpsSerie: string | null;
+  ctpsExpedicao: string | null;
+  ctpsUf: string | null;
+  cargo: string | null;
+  cboEsocial: string | null;
+  departamento: string | null;
+  setor: string | null;
+  admissao: string | null;
+  desligamento: string | null;
+  salarioAtual: number | null;
+  horasMensais: string | null;
+  sindicato: string | null;
+  formaRemuneracao: string | null;
+  emailContato: string | null;
+  celular: string | null;
+  alteracoesCargo: AlteracaoCargo[];
+  alteracoesSalariais: AlteracaoSalarial[];
+  ferias: Ferias[];
+  afastamentos: Afastamento[];
+}
+
 export interface LogEntry {
   id: string;
   level: string;
