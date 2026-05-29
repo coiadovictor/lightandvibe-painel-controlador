@@ -86,6 +86,7 @@ builder.Services.AddScoped<IInformationTypeService, InformationTypeService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IHollerithService, HollerithService>();
 builder.Services.AddScoped<IFichaRegistroService, FichaRegistroService>();
+builder.Services.AddScoped<IIntegracoesService, IntegracoesService>();
 
 // --- API ---
 builder.Services.AddControllers();

@@ -146,3 +146,16 @@ export interface LogEntry {
   source?: string | null;
   createdAt: string;
 }
+
+export interface Integracao {
+  id: number;
+  endpoint: string;
+  tabela: string;
+  acao?: string | null;
+  origem?: string | null;
+  quantidadeRegistros?: number | null;
+  situacao: 'em_andamento' | 'sucesso' | 'erro';
+  mensagemErro?: string | null;
+  dataInicio: string;
+  dataFim?: string | null;
+}
