@@ -78,7 +78,7 @@ export function IntegracoesPage() {
         <DataTable
           loading={isLoading}
           rows={data ?? []}
-          rowKey={(r) => r.id}
+          rowKey={(r) => String(r.id)}
           empty="Nenhuma integração registrada ainda."
           columns={[
             {
