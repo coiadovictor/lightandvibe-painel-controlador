@@ -74,6 +74,172 @@ function typeBadge(tipo: string) {
   return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{tipo}</span>;
 }
 
+function getSectorEmoji(setor: string): string {
+  const s = setor.toUpperCase().trim();
+
+  if (s.startsWith('VEND/') || s.startsWith('VEND /') || s.startsWith('VEND.')) return '🛒';
+  if (s.startsWith('V./') || s.startsWith('V/') || s.startsWith('V.DIVISAO/')) return '🛒';
+  if (s.startsWith('DIR/VEND') || s.startsWith('VEND./')) return '🛒';
+
+  const map: Record<string, string> = {
+    'ADMINIST-SERVICOS': '🏢',
+    'ADMINIST.SERVICOS': '🏢',
+    'AMBULATORIO MÉDICO': '🩺',
+    'AMBULATORIO MEDICO': '🩺',
+    'CONTAS A RECEBER': '💰',
+    'FINANCEIRO': '💰',
+    'COM./FATURAMENTO': '💰',
+    'HONORARIOS': '💰',
+    'MATRIZ DIV./CAIXA': '💰',
+    'RECURSOS HUMANOS': '👥',
+    'SEGURANCA TRABALHO': '🦺',
+    'TECNOLOGIA DA INFORMAÇÃO': '💻',
+    'TECNOLOGIA DA INFORMACAO': '💻',
+    'SUPORTE TECNICO': '🖥️',
+    'SEM SETOR': '⚠️',
+    'MANUTENCAO GERAL': '🔧',
+    'MANUTENCAO ELETRICA': '⚡',
+    'MANUTENCAO MAQUINAS': '🔧',
+    'MANUT./MAQUINAS': '🔧',
+    'OFICINA/MANUTENCAO': '🔧',
+    'ADMINISTR. E MANUT.': '🔧',
+    'MARKETING': '📢',
+    'RELACOES PUBLICAS': '📣',
+    'CONTABILIDADE': '📊',
+    'CONTROLADORIA': '📊',
+    'CPM - CONTR.PROD.MAT.': '📊',
+    'MANUT./CONSTRUCOES': '🏗️',
+    'MANUTENCAO CONSTRUC.': '🏗️',
+    'CAM.LAGES/CONSTRUCAO': '🏗️',
+    'PROJETOS': '🏗️',
+    'PROJETOS ESPECIAIS': '🏗️',
+    'ADMINISTRAÇÃO LOGISTICA': '🚚',
+    'ADMINISTRACAO LOGISTICA': '🚚',
+    'DIVISAO TRANSPORTES': '🚚',
+    'DIVISAO/TRANSPORTE': '🚚',
+    'V.DIVISAO/TRANSPORTE': '🚚',
+    'CONTROLE LOGISTICO DE PEDIDOS': '🚚',
+    'CONTROLE LOGIST PEDIDOS': '🚚',
+    'CENTRO DE DISTRIB.40': '🚚',
+    'CONSELHO DE ADMINIST': '👔',
+    'DIRETORIA COMERCIAL': '👔',
+    'DIRETORIA': '👔',
+    'GERENTES/COORDENAD.': '👔',
+    'TAFFMAN E': '👔',
+    'TAFFMAN-E': '👔',
+    'ADM.GERAL/STA ISABEL': '🏢',
+    'ADMINISTRACAO GERAL': '🏢',
+    'ADMINISTRAÇÃO GERAL': '🏢',
+    'ADMINISTRACAO': '🏢',
+    'ADMINISTRAÇÃO CA': '🏢',
+    'ADMINISTRAÇÃO AG/COM': '🏢',
+    'CENT/INS/ESCRITORIO': '🏢',
+    'ESCRIT.ADM.ORIENTAL': '🏢',
+    'ADMINIST./FRUTICASA': '🏢',
+    'ADM.GERAL/FRUTICASA': '🏢',
+    'ADM.GERAL-FABRICA': '🏢',
+    'ADM.GERAL - LORENA': '🏢',
+    'C.I.A.': '🏢',
+    'CENTRO GERAL-LAGOINHA': '🏢',
+    'REFEITORIO': '🍽️',
+    'REFEITORIO/FRUTICASA': '🍽️',
+    'AGROPECUARIA': '🌱',
+    'ADM.GERAL FAZENDA': '🌱',
+    'AGROPEC.FUNRURAL': '🌱',
+    'MANUT.REFRIGERACAO': '❄️',
+    'CAMARA-LAGES': '❄️',
+    'LABORATORIO ANALISE': '🧪',
+    'LABORAT./FRUTICASA': '🧪',
+    'LAB.PESQ/DESENVOLV.': '🧪',
+    'LAB.INS.ART.FUNRURAL': '🧪',
+    'GARANTIA DE QUALIDADE': '🧪',
+    'CONTROLE QUALIDADE': '🧪',
+    'CIENCIAS E PESQUISA': '🧪',
+    'CIDV/MICRO': '🔬',
+    'INJETORA': '🏭',
+    'PRODUCAO/ESSENCIAS': '🏭',
+    'PRODUCAO-SUCOS': '🏭',
+    'PRODUCAO/SUCOS': '🏭',
+    'PRODUCAO DE SUCO': '🏭',
+    'FABRICA/LORENA': '🏭',
+    'ENVASE-SOFYL': '🏭',
+    'ENVASE SOFYL': '🏭',
+    'ADIDOS FABRICA': '🏭',
+    'ADIDOS/LORENA': '🏭',
+    'PRODUCAO FABR 3': '🏭',
+    'ANDES DO SUL': '🌎',
+    'IMPORT./EXPORTACAO': '🌎',
+    'DIVISAO/FARMACEUTICA': '💊',
+    'DIVISÃO FARMACEUTICA': '💊',
+    'SUPLEMENTO': '💊',
+    'CADASTRO ASSIST.R.A.': '📋',
+    'LYNX': '💻',
+    'SIST. GESTÃO INTEGRADA': '💻',
+    'SIST.GESTÃO INTEGRADA': '💻',
+    'SIST. GESTAO INTEGRADA': '💻',
+    'SIST.GESTAO INTEGRADA': '💻',
+    'JABOTICABAL': '📍',
+    'CACY': '📍',
+    'ARARAQUARA': '📍',
+    'SAO CARLOS-C.A': '📍',
+    'CEARA-CA': '📍',
+    'AUTÔNOMOS': '👷',
+    'AUTONOMOS': '👷',
+    'ULTRA SONOGRAFIA': '🩺',
+    'TREINAMENTO E DIVULGAÇÃO': '🎓',
+    'TREINAMENTO E DIVULGACAO': '🎓',
+    'FERMENTACAO': '🧫',
+    'PRODUCAO VAPOR': '♨️',
+    'SEDE-COLONIA DE FERIAS': '🏖️',
+    'PROCESSO-SOFYL': '⚙️',
+    'PROCESSO SOFYL': '⚙️',
+    'ADM.VEICULOS': '🚗',
+    'LEGALIZACAO/VEICULOS': '🚗',
+    'PRESIDENCIA': '👑',
+    'PRESIDENCIA DE HONRA': '👑',
+    'AUDITORIA': '🔎',
+    'EVERESTE': '🏔️',
+    'PLAN.PESQ.ESPECIAIS': '📈',
+    'PLANEJAMENTO': '📈',
+    'DIVISAO/COSMETICOS': '💄',
+    'COSMETICOS-TECNICO': '💄',
+    'DEPTO JURIDICO': '⚖️',
+    'DEPTO FISCAL': '⚖️',
+    'SEMEN PARANA': '🐄',
+    'SEMEN B.H.': '🐄',
+    'WAGYU': '🐂',
+    'VILA MARIANA/ESTOQUE': '📦',
+    'ARMAZENAG./FRUTICASA': '📦',
+    'SUPRIMENTOS': '📦',
+    'ADM/COMPRAS/ALMOXARIFADO': '📦',
+    'ENGARRAFAMENTO I': '🍾',
+    'ENGARRAFAMENTO II': '🍾',
+    'ENGARRAFAMENTO': '🍾',
+    'SISTEMA TRATAM.AGUA': '💧',
+    'LATICINIOS': '🥛',
+    'ADIDOS': '🤝',
+    'ASSIST ADMINIST CREDITO': '💳',
+    'COMPRAS': '🛒',
+    'CAMARA/COMPRAS': '🛒',
+  };
+
+  if (map[s]) return map[s];
+
+  if (s.includes('MANUTENCAO') || s.includes('MANUT.') || s.includes('OFICINA')) return '🔧';
+  if (s.includes('PRODUCAO') || s.includes('FABRICA') || s.includes('ENVASE') || s.includes('ADIDOS')) return '🏭';
+  if (s.includes('REFEITORIO')) return '🍽️';
+  if (s.includes('LABORAT') || s.includes('LAB.') || s.includes('QUALIDADE') || s.includes('PESQUISA')) return '🧪';
+  if (s.includes('TRANSPORT') || s.includes('LOGIST') || s.includes('DISTRIB')) return '🚚';
+  if (s.includes('FINANC') || s.includes('FATURAMENTO') || s.includes('CAIXA')) return '💰';
+  if (s.includes('CONTAB') || s.includes('CONTROLA') || s.includes('CPM')) return '📊';
+  if (s.includes('INFORM') || s.includes('SIST.') || s.includes('SISTEMA') || s.includes('TECNOL')) return '💻';
+  if (s.includes('DIRETORIA') || s.includes('GERENTE') || s.includes('COORDENAD')) return '👔';
+  if (s.includes('AGROPEC') || s.includes('FAZENDA') || s.includes('FUNRURAL')) return '🌱';
+  if (s.includes('ADM') || s.includes('ADMINIST')) return '🏢';
+
+  return '📍';
+}
+
 function fmt(dt: string | null) {
   if (!dt) return '—';
   return new Date(dt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -152,7 +318,7 @@ export function LogsPage() {
                     className="w-full flex items-center justify-between py-1.5 px-1 rounded-lg hover:bg-gray-50 transition-colors text-left"
                   >
                     <span className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">
-                      {grupo.setor}
+                      {getSectorEmoji(grupo.setor)} {grupo.setor}
                     </span>
                     <div className="flex items-center gap-1.5">
                       <span className="text-[10px] text-ink-muted">{grupo.sessoes.length} sessão(ões)</span>
