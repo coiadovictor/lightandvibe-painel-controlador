@@ -1,22 +1,90 @@
-import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ScrollText, Users, Tags, FileText, GitMerge, Activity, X, LogOut, UserCog } from 'lucide-react';
+import { useState } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard, ScrollText, Users, Tags, FileText, GitMerge, Activity,
+  ChevronDown, X, LogOut, UserCog,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { Logo } from './Logo';
 import { useAuth } from '../../contexts/AuthContext';
 
-const items = [
+interface LeafItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  end?: boolean;
+}
+
+interface GroupItem {
+  label: string;
+  icon: LucideIcon;
+  children: LeafItem[];
+}
+
+type NavItem = LeafItem | GroupItem;
+
+const items: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/hollerith', label: 'Holerite', icon: FileText, end: false },
-  { to: '/logs', label: 'Logs', icon: ScrollText, end: false },
-  { to: '/employees', label: 'Funcionário', icon: Users, end: false },
-  { to: '/information-types', label: 'Tipo de Informação', icon: Tags, end: false },
-  { to: '/integracoes', label: 'Integrações', icon: GitMerge, end: false },
-  { to: '/ambiente-logs', label: 'Logs Internos do Ambiente', icon: Activity, end: false },
+  { to: '/hollerith', label: 'Holerite', icon: FileText },
+  {
+    label: 'Log',
+    icon: ScrollText,
+    children: [
+      { to: '/logs', label: 'Utilizações', icon: ScrollText },
+      { to: '/ambiente-logs', label: 'Monitoramento Interno', icon: Activity },
+    ],
+  },
+  { to: '/employees', label: 'Funcionário', icon: Users },
+  { to: '/information-types', label: 'Tipo de Informação', icon: Tags },
+  { to: '/integracoes', label: 'Integrações', icon: GitMerge },
 ];
+
+const leafClasses = (isActive: boolean) =>
+  clsx(
+    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
+    isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-muted hover:bg-slate-100 hover:text-ink',
+  );
 
 interface SidebarProps {
   mobileOpen: boolean;
   onClose: () => void;
+}
+
+function NavGroup({ group, onClose }: { group: GroupItem; onClose: () => void }) {
+  const location = useLocation();
+  const hasActiveChild = group.children.some((c) => location.pathname === c.to);
+  const [open, setOpen] = useState(hasActiveChild);
+  const { icon: Icon } = group;
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={clsx(
+          'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
+          hasActiveChild ? 'text-ink' : 'text-ink-muted hover:bg-slate-100 hover:text-ink',
+        )}
+      >
+        <Icon className="h-4 w-4" />
+        <span className="flex-1 text-left">{group.label}</span>
+        <ChevronDown className={clsx('h-4 w-4 transition-transform', open ? 'rotate-180' : '')} />
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-1 pl-4">
+          {group.children.map(({ to, label, icon: ChildIcon, end }) => (
+            <li key={to}>
+              <NavLink to={to} end={end} onClick={onClose} className={({ isActive }) => leafClasses(isActive)}>
+                <ChildIcon className="h-4 w-4" />
+                {label}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
 }
 
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
@@ -59,26 +127,23 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             Painel Controlador
           </p>
           <ul className="space-y-1">
-            {items.map(({ to, label, icon: Icon, end }) => (
-              <li key={to}>
-                <NavLink
-                  to={to}
-                  end={end}
-                  onClick={onClose}
-                  className={({ isActive }) =>
-                    clsx(
-                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
-                      isActive
-                        ? 'bg-brand-50 text-brand-700'
-                        : 'text-ink-muted hover:bg-slate-100 hover:text-ink',
-                    )
-                  }
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </NavLink>
-              </li>
-            ))}
+            {items.map((item) =>
+              'children' in item ? (
+                <NavGroup key={item.label} group={item} onClose={onClose} />
+              ) : (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    onClick={onClose}
+                    className={({ isActive }) => leafClasses(isActive)}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </NavLink>
+                </li>
+              ),
+            )}
           </ul>
         </nav>
 

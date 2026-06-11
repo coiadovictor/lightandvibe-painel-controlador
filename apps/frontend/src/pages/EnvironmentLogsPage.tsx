@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   RefreshCw, CheckCircle2, XCircle, AlertTriangle, AlertOctagon,
-  HelpCircle, Server, ChevronDown,
+  HelpCircle, Server, ChevronDown, MessageSquareWarning,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
@@ -66,7 +66,15 @@ const WINDOW_OPTIONS = [
   { hours: 6, label: '6h' },
   { hours: 24, label: '24h' },
   { hours: 48, label: '48h' },
+  { hours: 168, label: '7d' },
+  { hours: 360, label: '15d' },
+  { hours: 720, label: '30d' },
 ];
+
+function windowLabel(hours: number) {
+  if (hours <= 48) return `${hours} horas`;
+  return `${Math.round(hours / 24)} dias`;
+}
 
 // ---------- cartão de saúde ----------
 
@@ -109,7 +117,9 @@ function HealthCard({ c }: { c: ContainerHealth }) {
 // ---------- linha do tempo ----------
 
 function TimelineItem({ inc }: { inc: Incident }) {
-  const { tone, Icon } = severityInfo(inc.severity);
+  const sev = severityInfo(inc.severity);
+  const tone = sev.tone;
+  const Icon = inc.type === 'whatsapp' ? MessageSquareWarning : sev.Icon;
   const t = TONE_CLASSES[tone];
   return (
     <div className="relative flex gap-4 pb-5 last:pb-0">
@@ -252,12 +262,32 @@ export function EnvironmentLogsPage() {
     },
   });
 
+  const whatsappAlerts = (data?.incidents ?? []).filter((i) => i.type === 'whatsapp');
+  const lastWhatsappAlert = whatsappAlerts[0]; // já vem do mais recente pro mais antigo
+
   return (
     <div>
       <PageHeader
         title="Logs Internos do Ambiente"
         description="Acompanhe a saúde dos serviços por trás do atendimento (WhatsApp, automações e banco de dados) e veja, em linguagem clara, o que aconteceu de errado."
       />
+
+      {lastWhatsappAlert && (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border-2 border-rose-300 bg-rose-50 p-4 shadow-sm">
+          <MessageSquareWarning className="mt-0.5 h-6 w-6 shrink-0 text-rose-600" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-rose-800">WhatsApp pode estar desconectado!</p>
+            <p className="mt-1 text-sm text-rose-700">
+              Detectamos sinal de queda/desconexão do WhatsApp no Evolution
+              {lastWhatsappAlert.timestamp ? ` por volta das ${fmtTime(lastWhatsappAlert.timestamp)}` : ''}.
+              {' '}<span className="font-medium">Acesse o Evolution API e reconecte lendo o QR Code novamente.</span>
+            </p>
+            <p className="mt-1 text-xs text-rose-600">
+              {whatsappAlerts.length} sinal(is) na janela selecionada. Se já reconectou, este alerta some quando a janela não tiver mais o evento.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
@@ -315,7 +345,7 @@ export function EnvironmentLogsPage() {
           <div className="flex items-center gap-2">
             <Server className="h-4 w-4 text-ink-muted" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
-              Linha do tempo — o que aconteceu nas últimas {windowHours}h
+              Linha do tempo — o que aconteceu nas últimas {windowLabel(windowHours)}
             </h2>
           </div>
           <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
@@ -338,7 +368,7 @@ export function EnvironmentLogsPage() {
           {data && data.incidents.length === 0 ? (
             <div className="flex items-center gap-2 text-sm text-green-700">
               <CheckCircle2 className="h-5 w-5" />
-              Nenhum problema detectado nas últimas {windowHours}h. Tudo funcionando normalmente.
+              Nenhum problema detectado nas últimas {windowLabel(windowHours)}. Tudo funcionando normalmente.
             </div>
           ) : (
             <Timeline incidents={data?.incidents ?? []} />

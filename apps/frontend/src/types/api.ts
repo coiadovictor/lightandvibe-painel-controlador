@@ -179,7 +179,7 @@ export interface ContainerHealth {
 export interface Incident {
   timestamp?: string | null;
   container: string;
-  type: 'restart' | 'oom' | 'exit' | 'log';
+  type: 'restart' | 'oom' | 'exit' | 'log' | 'whatsapp';
   severity: 'warning' | 'error' | 'critical';
   message: string;
   detail?: string | null;
