@@ -46,6 +46,14 @@ var dockerOpts = DockerOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(dockerOpts);
 builder.Services.AddSingleton<IDockerLogsService, DockerLogsService>();
 
+// --- Evolution (estado das instâncias do WhatsApp) ---
+var evolutionOpts = EvolutionOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(evolutionOpts);
+builder.Services.AddHttpClient<IWhatsAppStatusService, WhatsAppStatusService>(c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(10);
+});
+
 // --- Supabase REST ---
 var sbOpts = builder.Configuration.GetSection(SupabaseOptions.SectionName).Get<SupabaseOptions>()
     ?? new SupabaseOptions();

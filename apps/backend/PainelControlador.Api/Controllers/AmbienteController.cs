@@ -13,17 +13,30 @@ namespace PainelControlador.Api.Controllers;
 public class AmbienteController : ControllerBase
 {
     private readonly IDockerLogsService _docker;
+    private readonly IWhatsAppStatusService _whatsapp;
 
-    public AmbienteController(IDockerLogsService docker) => _docker = docker;
+    public AmbienteController(IDockerLogsService docker, IWhatsAppStatusService whatsapp)
+    {
+        _docker = docker;
+        _whatsapp = whatsapp;
+    }
 
     /// <summary>
     /// Saúde dos containers monitorados + linha do tempo de incidentes na janela
-    /// (em horas, padrão 48, máx. 48).
+    /// (em horas, padrão 48, máx. 720 = 30 dias) + estado atual do WhatsApp.
     /// </summary>
     [HttpGet("overview")]
     public async Task<IActionResult> Overview([FromQuery] int hours = 48, CancellationToken ct = default)
     {
-        var result = await _docker.GetOverviewAsync(hours, ct);
+        var overview = await _docker.GetOverviewAsync(hours, ct);
+        var wa = await _whatsapp.GetStatusAsync(ct);
+
+        var result = overview with
+        {
+            WhatsAppAvailable = wa.Available,
+            WhatsAppMessage = wa.Message,
+            WhatsApp = wa.Instances,
+        };
         return Ok(result);
     }
 

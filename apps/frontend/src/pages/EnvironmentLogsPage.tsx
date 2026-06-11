@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   RefreshCw, CheckCircle2, XCircle, AlertTriangle, AlertOctagon,
-  HelpCircle, Server, ChevronDown, MessageSquareWarning,
+  HelpCircle, Server, ChevronDown, MessageSquareWarning, Smartphone,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
-import type { AmbienteOverview, ContainerHealth, Incident, ContainerLogs } from '@/types/api';
+import type { AmbienteOverview, ContainerHealth, Incident, ContainerLogs, WhatsAppInstance } from '@/types/api';
 
 const REFRESH_MS = 5000;
 
@@ -47,6 +47,11 @@ function severityInfo(sev: Incident['severity']): { tone: Tone; Icon: typeof Ale
 function fmtTime(ts?: string | null) {
   if (!ts) return '—';
   return new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDateTime(ts?: string | null) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString('pt-BR');
 }
 
 function dayLabel(ts?: string | null) {
@@ -109,6 +114,40 @@ function HealthCard({ c }: { c: ContainerHealth }) {
             </span>
           )}
         </div>
+      )}
+    </Card>
+  );
+}
+
+// ---------- card de instância do WhatsApp ----------
+
+function WhatsAppCard({ inst }: { inst: WhatsAppInstance }) {
+  const connected = inst.connected;
+  const tone: Tone = connected ? 'green' : 'red';
+  const t = TONE_CLASSES[tone];
+  return (
+    <Card className={clsx(!connected && 'border-rose-300')}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Smartphone className="h-4 w-4 text-ink-muted" />
+            <p className="truncate text-sm font-semibold text-ink">{inst.name}</p>
+          </div>
+          <p className="mt-0.5 truncate text-xs text-ink-muted">
+            {inst.profileName ? `${inst.profileName}` : 'WhatsApp'}
+            {inst.number ? ` · ${inst.number}` : ''}
+          </p>
+        </div>
+        <span className={clsx('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap', t.badge)}>
+          {connected ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+          {connected ? 'Conectado' : 'Desconectado'}
+        </span>
+      </div>
+      {!connected && (
+        <p className="mt-3 rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">
+          Reconecte lendo o QR Code no Evolution
+          {inst.disconnectedAt ? ` · caiu em ${fmtDateTime(inst.disconnectedAt)}` : ''}
+        </p>
       )}
     </Card>
   );
@@ -262,6 +301,12 @@ export function EnvironmentLogsPage() {
     },
   });
 
+  // Estado AUTORITATIVO (consulta direta à Evolution) — tem prioridade.
+  const waInstances = data?.whatsApp ?? [];
+  const waDisconnected = waInstances.filter((i) => !i.connected);
+  const waAuthoritative = !!data?.whatsAppAvailable;
+
+  // Fallback por LOG (só quando a checagem autoritativa não está disponível).
   const whatsappAlerts = (data?.incidents ?? []).filter((i) => i.type === 'whatsapp');
   const lastWhatsappAlert = whatsappAlerts[0]; // já vem do mais recente pro mais antigo
 
@@ -272,7 +317,25 @@ export function EnvironmentLogsPage() {
         description="Acompanhe a saúde dos serviços por trás do atendimento (WhatsApp, automações e banco de dados) e veja, em linguagem clara, o que aconteceu de errado."
       />
 
-      {lastWhatsappAlert && (
+      {/* Alerta AUTORITATIVO de WhatsApp desconectado (estado atual real) */}
+      {waAuthoritative && waDisconnected.length > 0 && (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border-2 border-rose-400 bg-rose-50 p-4 shadow-sm">
+          <MessageSquareWarning className="mt-0.5 h-6 w-6 shrink-0 text-rose-600" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-rose-800">
+              WhatsApp DESCONECTADO agora — ação necessária!
+            </p>
+            <p className="mt-1 text-sm text-rose-700">
+              {waDisconnected.map((i) => i.name + (i.number ? ` (${i.number})` : '')).join(', ')}
+              {' '}está fora do ar.{' '}
+              <span className="font-medium">Acesse o Evolution API e reconecte lendo o QR Code.</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Fallback por log: só quando a checagem autoritativa não está disponível */}
+      {!waAuthoritative && lastWhatsappAlert && (
         <div className="mb-5 flex items-start gap-3 rounded-xl border-2 border-rose-300 bg-rose-50 p-4 shadow-sm">
           <MessageSquareWarning className="mt-0.5 h-6 w-6 shrink-0 text-rose-600" />
           <div className="min-w-0">
@@ -328,7 +391,35 @@ export function EnvironmentLogsPage() {
         </div>
       )}
 
-      {/* Cartões de saúde */}
+      {/* Status do WhatsApp (estado autoritativo) */}
+      {waAuthoritative && waInstances.length > 0 && (
+        <div className="mb-6">
+          <div className="mb-3 flex items-center gap-2">
+            <Smartphone className="h-4 w-4 text-ink-muted" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
+              WhatsApp — conexão das instâncias
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {waInstances.map((inst) => <WhatsAppCard key={inst.name} inst={inst} />)}
+          </div>
+        </div>
+      )}
+
+      {waAuthoritative === false && data?.whatsAppMessage && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-ink-muted">
+          <Smartphone className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>Status do WhatsApp em tempo real indisponível: {data.whatsAppMessage}</span>
+        </div>
+      )}
+
+      {/* Cartões de saúde dos serviços */}
+      <div className="mb-3 flex items-center gap-2">
+        <Server className="h-4 w-4 text-ink-muted" />
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
+          Saúde dos serviços
+        </h2>
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => (

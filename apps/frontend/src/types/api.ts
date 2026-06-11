@@ -185,12 +185,24 @@ export interface Incident {
   detail?: string | null;
 }
 
+export interface WhatsAppInstance {
+  name: string;
+  state: string;          // open | connecting | close | unknown
+  connected: boolean;
+  profileName?: string | null;
+  number?: string | null;
+  disconnectedAt?: string | null;
+}
+
 export interface AmbienteOverview {
   available: boolean;
   message?: string | null;
   windowHours: number;
   containers: ContainerHealth[];
   incidents: Incident[];
+  whatsAppAvailable: boolean;
+  whatsAppMessage?: string | null;
+  whatsApp: WhatsAppInstance[];
 }
 
 export interface LogLine {

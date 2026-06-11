@@ -120,3 +120,20 @@ do **backend do painel**:
 A mudança é aditiva e afeta apenas o container do painel-backend — os demais
 serviços não são tocados. Sem o socket montado, a página exibe um aviso amigável
 e o restante do painel segue funcionando normalmente.
+
+### Estado do WhatsApp (Evolution API)
+
+A página também mostra o **estado atual (autoritativo) das instâncias do WhatsApp**,
+consultando `GET /instance/fetchInstances` na Evolution API. Quando uma instância
+está desconectada (precisa reler o QR Code), aparece um **alerta vermelho no topo**
+para o atendimento agir. Esse alerta liga/desliga sozinho conforme conecta/desconecta.
+
+Env vars (no service do backend):
+
+- `EVOLUTION_API_URL` — DNS interno do Swarm (recomendado): `http://n8n_evolution-api:8080`.
+  Alternativa pública: `https://evolution.lightandvibe.com`.
+- `EVOLUTION_API_KEY` — a `AUTHENTICATION_API_KEY` da Evolution. **Não commitar** —
+  definir como env var no EasyPanel.
+
+Sem essas variáveis, o status em tempo real fica indisponível (mensagem amigável) e
+o sistema cai no detector secundário por log; o resto da página segue normal.
