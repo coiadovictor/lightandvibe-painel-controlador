@@ -29,13 +29,15 @@ public partial class DockerLogsService : IDockerLogsService
     private readonly ILogger<DockerLogsService> _logger;
     private readonly HttpClient _http;
 
-    // Padrões que indicam queda/desconexão/sobrecarga nos logs.
-    [GeneratedRegex(@"disconnect|connection closed|logout|out of memory|fatal|econnrefused|econnreset|panic|rate limit|\b429\b",
+    // Sinais de ERRO real (alto sinal). Evita números soltos como "429" em
+    // timestamps/tempos do Postgres (ex.: "total=0.429 s"), que geravam falso rate limit.
+    [GeneratedRegex(@"out of memory|\boom\b|\bfatal\b|\bpanic\b|econnrefused|econnreset|etimedout|deadlock|rate limit|too many requests",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex IncidentPattern();
 
     // Sinais fortes de que a INSTÂNCIA do WhatsApp caiu/deslogou e precisa reler o QR.
-    [GeneratedRegex(@"logged\s?out|loggedout|disconnectreason|qr\s?code|qrcode|restart\s?required|\breplaced\b|\bconflict\b|connection\s?closed",
+    // (sem "connection closed": no Baileys é reconexão transitória, vira ruído)
+    [GeneratedRegex(@"logged\s?out|loggedout|disconnectreason|qr\s?code|qrcode|restart\s?required|\breplaced\b|\bconflict\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex WhatsAppDownPattern();
 
@@ -241,15 +243,13 @@ public partial class DockerLogsService : IDockerLogsService
     private static string FriendlyLogReason(string text)
     {
         var t = text.ToLowerInvariant();
-        if (t.Contains("out of memory")) return "Faltou memória no servidor.";
-        if (t.Contains("disconnect") || t.Contains("connection closed") || t.Contains("logout"))
-            return "A conexão caiu / o serviço desconectou (pode afetar o envio e recebimento de mensagens).";
-        if (t.Contains("rate limit") || Regex.IsMatch(t, @"\b429\b"))
+        if (t.Contains("out of memory") || t.Contains("oom")) return "Faltou memória no servidor.";
+        if (t.Contains("rate limit") || t.Contains("too many requests"))
             return "Bloqueio temporário por excesso de requisições (rate limit).";
-        if (t.Contains("econnrefused") || t.Contains("econnreset"))
+        if (t.Contains("deadlock")) return "Conflito de acesso ao banco de dados (deadlock).";
+        if (t.Contains("econnrefused") || t.Contains("econnreset") || t.Contains("etimedout"))
             return "Falha de comunicação entre os serviços.";
-        if (t.Contains("panic") || t.Contains("fatal"))
-            return "Erro grave registrado no serviço.";
+        if (t.Contains("panic") || t.Contains("fatal")) return "Erro grave registrado no serviço.";
         return "Erro registrado no serviço.";
     }
 
