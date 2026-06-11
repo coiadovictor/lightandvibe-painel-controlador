@@ -31,13 +31,15 @@ public partial class DockerLogsService : IDockerLogsService
 
     // Sinais de ERRO real (alto sinal). Evita números soltos como "429" em
     // timestamps/tempos do Postgres (ex.: "total=0.429 s"), que geravam falso rate limit.
-    [GeneratedRegex(@"out of memory|\boom\b|\bfatal\b|\bpanic\b|econnrefused|econnreset|etimedout|deadlock|rate limit|too many requests",
+    // OOM fica de fora aqui — já é detectado de forma confiável pelo OOMKilled estrutural.
+    [GeneratedRegex(@"out of memory|\bfatal\b|\bpanic\b|econnrefused|econnreset|etimedout|deadlock|rate limit|too many requests",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex IncidentPattern();
 
-    // Sinais fortes de que a INSTÂNCIA do WhatsApp caiu/deslogou e precisa reler o QR.
-    // (sem "connection closed": no Baileys é reconexão transitória, vira ruído)
-    [GeneratedRegex(@"logged\s?out|loggedout|disconnectreason|qr\s?code|qrcode|restart\s?required|\breplaced\b|\bconflict\b",
+    // Apenas sinais DEFINITIVOS de "precisa reler o QR" — fallback do check autoritativo.
+    // Fora de propósito: disconnectreason (toda reconexão), restartRequired (normal pós-QR),
+    // qrcode (também aparece no pareamento normal), connection closed (reconexão Baileys).
+    [GeneratedRegex(@"logged\s?out|loggedout|device_removed|\bconflict\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex WhatsAppDownPattern();
 
