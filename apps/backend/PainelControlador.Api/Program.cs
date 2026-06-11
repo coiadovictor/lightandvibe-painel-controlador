@@ -41,6 +41,11 @@ if (!n8nOpts.IsConfigured)
 builder.Services.AddSingleton(n8nOpts);
 builder.Services.AddScoped<IN8nDbService, N8nDbService>();
 
+// --- Docker (Logs Internos do Ambiente) ---
+var dockerOpts = DockerOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(dockerOpts);
+builder.Services.AddSingleton<IDockerLogsService, DockerLogsService>();
+
 // --- Supabase REST ---
 var sbOpts = builder.Configuration.GetSection(SupabaseOptions.SectionName).Get<SupabaseOptions>()
     ?? new SupabaseOptions();

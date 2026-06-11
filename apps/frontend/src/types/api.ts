@@ -159,3 +159,49 @@ export interface Integracao {
   dataInicio: string;
   dataFim?: string | null;
 }
+
+// --- Logs Internos do Ambiente ---
+
+export interface ContainerHealth {
+  alias: string;
+  matcher: string;
+  name?: string | null;
+  id?: string | null;
+  found: boolean;
+  status: string;        // running | exited | restarting | not_found | ...
+  restartCount: number;
+  oomKilled: boolean;
+  exitCode: number;
+  startedAt?: string | null;
+  image?: string | null;
+}
+
+export interface Incident {
+  timestamp?: string | null;
+  container: string;
+  type: 'restart' | 'oom' | 'exit' | 'log';
+  severity: 'warning' | 'error' | 'critical';
+  message: string;
+  detail?: string | null;
+}
+
+export interface AmbienteOverview {
+  available: boolean;
+  message?: string | null;
+  windowHours: number;
+  containers: ContainerHealth[];
+  incidents: Incident[];
+}
+
+export interface LogLine {
+  timestamp?: string | null;
+  stream: 'stdout' | 'stderr';
+  text: string;
+}
+
+export interface ContainerLogs {
+  available: boolean;
+  message?: string | null;
+  container: string;
+  lines: LogLine[];
+}

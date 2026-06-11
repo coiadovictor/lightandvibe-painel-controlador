@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ScrollText, Users, Tags, FileText, GitMerge, X, LogOut, UserCog } from 'lucide-react';
+import { LayoutDashboard, ScrollText, Users, Tags, FileText, GitMerge, Activity, X, LogOut, UserCog } from 'lucide-react';
 import clsx from 'clsx';
 import { Logo } from './Logo';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,6 +11,7 @@ const items = [
   { to: '/employees', label: 'Funcionário', icon: Users, end: false },
   { to: '/information-types', label: 'Tipo de Informação', icon: Tags, end: false },
   { to: '/integracoes', label: 'Integrações', icon: GitMerge, end: false },
+  { to: '/ambiente-logs', label: 'Logs Internos do Ambiente', icon: Activity, end: false },
 ];
 
 interface SidebarProps {
