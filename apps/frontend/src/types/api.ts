@@ -179,10 +179,19 @@ export interface ContainerHealth {
 export interface Incident {
   timestamp?: string | null;
   container: string;
-  type: 'restart' | 'oom' | 'exit' | 'log';
+  type: 'restart' | 'oom' | 'exit' | 'log' | 'whatsapp';
   severity: 'warning' | 'error' | 'critical';
   message: string;
   detail?: string | null;
+}
+
+export interface WhatsAppInstance {
+  name: string;
+  state: string;          // open | connecting | close | unknown
+  connected: boolean;
+  profileName?: string | null;
+  number?: string | null;
+  disconnectedAt?: string | null;
 }
 
 export interface AmbienteOverview {
@@ -191,6 +200,9 @@ export interface AmbienteOverview {
   windowHours: number;
   containers: ContainerHealth[];
   incidents: Incident[];
+  whatsAppAvailable: boolean;
+  whatsAppMessage?: string | null;
+  whatsApp: WhatsAppInstance[];
 }
 
 export interface LogLine {

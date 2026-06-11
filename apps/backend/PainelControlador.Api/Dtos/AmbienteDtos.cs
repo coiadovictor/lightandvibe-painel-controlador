@@ -32,14 +32,30 @@ public record IncidentDto(
     string? Detail         // linha de log crua (modo técnico); null para incidentes estruturais
 );
 
-/// <summary>Visão geral: saúde de todos os monitorados + linha do tempo de incidentes.</summary>
+/// <summary>Estado atual (autoritativo) de uma instância do WhatsApp na Evolution.</summary>
+public record WhatsAppInstanceDto(
+    string Name,
+    string State,              // open | connecting | close | unknown
+    bool Connected,            // State == "open"
+    string? ProfileName,
+    string? Number,            // derivado do ownerJid
+    DateTime? DisconnectedAt
+);
+
+/// <summary>Visão geral: saúde dos containers + linha do tempo + estado do WhatsApp.</summary>
 public record AmbienteOverviewDto(
     bool Available,            // o socket está acessível?
     string? Message,           // mensagem quando indisponível
     int WindowHours,           // janela aplicada (horas) da linha do tempo
     IReadOnlyList<ContainerHealthDto> Containers,
     IReadOnlyList<IncidentDto> Incidents
-);
+)
+{
+    /// <summary>A checagem do Evolution está configurada e respondeu?</summary>
+    public bool WhatsAppAvailable { get; init; }
+    public string? WhatsAppMessage { get; init; }
+    public IReadOnlyList<WhatsAppInstanceDto> WhatsApp { get; init; } = Array.Empty<WhatsAppInstanceDto>();
+}
 
 /// <summary>Tail de log de um container específico.</summary>
 public record ContainerLogsDto(

@@ -23,7 +23,7 @@ public partial class DockerLogsService : IDockerLogsService
     private const int IncidentScanTail = 5000;  // teto de linhas varridas na janela
     private const int MaxLogIncidentsPerContainer = 200;
     private const int DefaultWindowHours = 48;
-    private const int MaxWindowHours = 48;
+    private const int MaxWindowHours = 720;  // até 30 dias
 
     private readonly DockerOptions _opts;
     private readonly ILogger<DockerLogsService> _logger;
@@ -33,6 +33,11 @@ public partial class DockerLogsService : IDockerLogsService
     [GeneratedRegex(@"disconnect|connection closed|logout|out of memory|fatal|econnrefused|econnreset|panic|rate limit|\b429\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex IncidentPattern();
+
+    // Sinais fortes de que a INSTÂNCIA do WhatsApp caiu/deslogou e precisa reler o QR.
+    [GeneratedRegex(@"logged\s?out|loggedout|disconnectreason|qr\s?code|qrcode|restart\s?required|\breplaced\b|\bconflict\b|connection\s?closed",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex WhatsAppDownPattern();
 
     // Prefixo de timestamp RFC3339 que o Docker adiciona quando timestamps=1.
     [GeneratedRegex(@"^(\S+?)\s(.*)$", RegexOptions.Compiled)]
@@ -126,7 +131,7 @@ public partial class DockerLogsService : IDockerLogsService
             try
             {
                 var lines = await FetchLogsAsync(match.Id, inspect?.Tty ?? false, IncidentScanTail, ct, sinceUnix);
-                incidents.AddRange(LogIncidents(mon.Alias, lines));
+                incidents.AddRange(LogIncidents(mon, lines));
             }
             catch (Exception ex) { _logger.LogWarning(ex, "Falha ao ler logs de {Name}", match.Name); }
         }
@@ -191,21 +196,45 @@ public partial class DockerLogsService : IDockerLogsService
                 "O serviço parou de funcionar inesperadamente.", null);
     }
 
-    private static IEnumerable<IncidentDto> LogIncidents(string alias, IReadOnlyList<LogLineDto> lines)
+    private static IEnumerable<IncidentDto> LogIncidents(MonitoredContainer mon, IReadOnlyList<LogLineDto> lines)
     {
+        var isEvolutionApp = IsEvolutionApp(mon);
         var hits = new List<IncidentDto>();
+
         foreach (var line in lines)
         {
+            // Prioridade: sinal de WhatsApp caído (só no app Evolution) — alerta acionável.
+            if (isEvolutionApp && WhatsAppDownPattern().IsMatch(line.Text))
+            {
+                hits.Add(new IncidentDto(line.Timestamp, mon.Alias, "whatsapp", "critical",
+                    "⚠️ O WhatsApp do Evolution caiu/desconectou. Acesse o Evolution API e reconecte lendo o QR Code novamente.",
+                    line.Text.Trim()));
+                continue;
+            }
+
             if (!IncidentPattern().IsMatch(line.Text)) continue;
             var severity = line.Stream == "stderr" ? "error" : "warning";
-            // Mensagem em linguagem clara + a linha crua guardada como detalhe técnico.
-            hits.Add(new IncidentDto(line.Timestamp, alias, "log", severity,
+            hits.Add(new IncidentDto(line.Timestamp, mon.Alias, "log", severity,
                 FriendlyLogReason(line.Text), line.Text.Trim()));
         }
+
         // mantém só os mais recentes pra não inundar a timeline
         return hits
             .OrderByDescending(i => i.Timestamp ?? DateTime.MinValue)
             .Take(MaxLogIncidentsPerContainer);
+    }
+
+    /// <summary>
+    /// É o container do APP Evolution (não o Postgres/Redis dele)? Usado para ligar a
+    /// detecção de "WhatsApp caiu" apenas onde faz sentido.
+    /// </summary>
+    private static bool IsEvolutionApp(MonitoredContainer mon)
+    {
+        var hay = (mon.Alias + " " + mon.Matcher).ToLowerInvariant();
+        return hay.Contains("evolution")
+            && !hay.Contains("postgres")
+            && !hay.Contains("-db")
+            && !hay.Contains("redis");
     }
 
     /// <summary>Traduz um padrão técnico de log para algo que o atendimento entende.</summary>
