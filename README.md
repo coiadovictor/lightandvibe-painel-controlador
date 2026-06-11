@@ -97,5 +97,26 @@ Configuração detalhada (domínios, SSL, auto-deploy via webhook) fica a cargo 
 | GET | `/api/employees/{id}` | detalhes de funcionário |
 | GET | `/api/information-types` | tipos de informação |
 | GET | `/api/logs` | logs (estrutura inicial) |
+| GET | `/api/ambiente/overview?hours=48` | saúde dos containers + linha do tempo de incidentes |
+| GET | `/api/ambiente/logs?container={alias}&tail=300` | tail de log de um container monitorado |
 
 Swagger disponível em `http://localhost:5080/swagger` em dev.
+
+## Logs Internos do Ambiente
+
+A página **Logs Internos do Ambiente** mostra, em linguagem clara para o time de
+atendimento, a saúde dos containers do stack do chatbot (Evolution, n8n, Postgres)
+e uma linha do tempo (até 48h) com o que deu errado: quedas, reinícios, falta de
+memória (OOM) e desconexões.
+
+O backend lê a **Docker Engine API** via unix socket, **somente leitura** — nunca
+inicia/para/reinicia containers. Para habilitar em produção (EasyPanel), no service
+do **backend do painel**:
+
+1. **Volume mount** (read-only): `/var/run/docker.sock:/var/run/docker.sock:ro`
+2. **Env var** `MONITORED_CONTAINERS` (CSV `Alias=prefixo_do_servico`), ex.:
+   `Evolution=n8n_evolution-api,n8n=n8n_n8n,Postgres Evolution=n8n_evolution-api-db,Postgres n8n=n8n_n8n-postgres`
+
+A mudança é aditiva e afeta apenas o container do painel-backend — os demais
+serviços não são tocados. Sem o socket montado, a página exibe um aviso amigável
+e o restante do painel segue funcionando normalmente.
