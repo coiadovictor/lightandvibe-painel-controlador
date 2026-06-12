@@ -47,6 +47,18 @@ public partial class DockerLogsService : IDockerLogsService
     [GeneratedRegex(@"^(\S+?)\s(.*)$", RegexOptions.Compiled)]
     private static partial Regex TimestampedLine();
 
+    // Códigos de cor ANSI (ex.: ESC[1m, ESC[34m) que sujam o log do Evolution.
+    [GeneratedRegex(@"\x1b\[[0-9;]*m", RegexOptions.Compiled)]
+    private static partial Regex AnsiCodes();
+
+    // Marcadores de nível que indicam ERRO (case-sensitive — níveis são MAIÚSCULOS).
+    [GeneratedRegex(@"\b(ERROR|ERRO|WARN|WARNING|FATAL|PANIC)\b", RegexOptions.Compiled)]
+    private static partial Regex ErrorLevel();
+
+    // Marcadores de nível benigno (rotina). Linhas assim não são incidente.
+    [GeneratedRegex(@"\b(INFO|DEBUG|VERBOSE|TRACE|NOTICE|LOG)\b", RegexOptions.Compiled)]
+    private static partial Regex BenignLevel();
+
     public DockerLogsService(DockerOptions opts, ILogger<DockerLogsService> logger)
     {
         _opts = opts;
@@ -217,6 +229,10 @@ public partial class DockerLogsService : IDockerLogsService
             }
 
             if (!IncidentPattern().IsMatch(line.Text)) continue;
+            // Ignora linhas de nível benigno (INFO/DEBUG/LOG) — ex.: o INFO
+            // "Update Message duplicated ignored [avoid deadlock]" do Evolution,
+            // ou os "LOG: checkpoint" de rotina do Postgres.
+            if (IsBenignLevel(line.Text)) continue;
             var severity = line.Stream == "stderr" ? "error" : "warning";
             hits.Add(new IncidentDto(line.Timestamp, mon.Alias, "log", severity,
                 FriendlyLogReason(line.Text), line.Text.Trim()));
@@ -372,17 +388,30 @@ public partial class DockerLogsService : IDockerLogsService
                     System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
                     out var ts))
             {
-                result.Add(new LogLineDto(ts, stream, m.Groups[2].Value));
+                result.Add(new LogLineDto(ts, stream, CleanText(m.Groups[2].Value)));
             }
             else
             {
-                result.Add(new LogLineDto(null, stream, line));
+                result.Add(new LogLineDto(null, stream, CleanText(line)));
             }
         }
         return result;
     }
 
     // ---------- helpers ----------
+
+    /// <summary>Remove códigos de cor ANSI e espaços nas pontas.</summary>
+    private static string CleanText(string s) => AnsiCodes().Replace(s, "").Trim();
+
+    /// <summary>
+    /// A linha é de nível benigno (rotina)? Erro explícito (ERROR/WARN/FATAL/PANIC)
+    /// tem prioridade e nunca é considerado benigno.
+    /// </summary>
+    private static bool IsBenignLevel(string text)
+    {
+        if (ErrorLevel().IsMatch(text)) return false;
+        return BenignLevel().IsMatch(text);
+    }
 
     private static bool Matches(string name, string matcher)
     {
