@@ -31,19 +31,33 @@ public partial class DockerLogsService : IDockerLogsService
 
     // Sinais de ERRO real (alto sinal). Evita números soltos como "429" em
     // timestamps/tempos do Postgres (ex.: "total=0.429 s"), que geravam falso rate limit.
-    [GeneratedRegex(@"out of memory|\boom\b|\bfatal\b|\bpanic\b|econnrefused|econnreset|etimedout|deadlock|rate limit|too many requests",
+    // OOM fica de fora aqui — já é detectado de forma confiável pelo OOMKilled estrutural.
+    [GeneratedRegex(@"out of memory|\bfatal\b|\bpanic\b|econnrefused|econnreset|etimedout|deadlock|rate limit|too many requests",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex IncidentPattern();
 
-    // Sinais fortes de que a INSTÂNCIA do WhatsApp caiu/deslogou e precisa reler o QR.
-    // (sem "connection closed": no Baileys é reconexão transitória, vira ruído)
-    [GeneratedRegex(@"logged\s?out|loggedout|disconnectreason|qr\s?code|qrcode|restart\s?required|\breplaced\b|\bconflict\b",
+    // Apenas sinais DEFINITIVOS de "precisa reler o QR" — fallback do check autoritativo.
+    // Fora de propósito: disconnectreason (toda reconexão), restartRequired (normal pós-QR),
+    // qrcode (também aparece no pareamento normal), connection closed (reconexão Baileys).
+    [GeneratedRegex(@"logged\s?out|loggedout|device_removed|\bconflict\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex WhatsAppDownPattern();
 
     // Prefixo de timestamp RFC3339 que o Docker adiciona quando timestamps=1.
     [GeneratedRegex(@"^(\S+?)\s(.*)$", RegexOptions.Compiled)]
     private static partial Regex TimestampedLine();
+
+    // Códigos de cor ANSI (ex.: ESC[1m, ESC[34m) que sujam o log do Evolution.
+    [GeneratedRegex(@"\x1b\[[0-9;]*m", RegexOptions.Compiled)]
+    private static partial Regex AnsiCodes();
+
+    // Marcadores de nível que indicam ERRO (case-sensitive — níveis são MAIÚSCULOS).
+    [GeneratedRegex(@"\b(ERROR|ERRO|WARN|WARNING|FATAL|PANIC)\b", RegexOptions.Compiled)]
+    private static partial Regex ErrorLevel();
+
+    // Marcadores de nível benigno (rotina). Linhas assim não são incidente.
+    [GeneratedRegex(@"\b(INFO|DEBUG|VERBOSE|TRACE|NOTICE|LOG)\b", RegexOptions.Compiled)]
+    private static partial Regex BenignLevel();
 
     public DockerLogsService(DockerOptions opts, ILogger<DockerLogsService> logger)
     {
@@ -215,6 +229,10 @@ public partial class DockerLogsService : IDockerLogsService
             }
 
             if (!IncidentPattern().IsMatch(line.Text)) continue;
+            // Ignora linhas de nível benigno (INFO/DEBUG/LOG) — ex.: o INFO
+            // "Update Message duplicated ignored [avoid deadlock]" do Evolution,
+            // ou os "LOG: checkpoint" de rotina do Postgres.
+            if (IsBenignLevel(line.Text)) continue;
             var severity = line.Stream == "stderr" ? "error" : "warning";
             hits.Add(new IncidentDto(line.Timestamp, mon.Alias, "log", severity,
                 FriendlyLogReason(line.Text), line.Text.Trim()));
@@ -370,17 +388,30 @@ public partial class DockerLogsService : IDockerLogsService
                     System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
                     out var ts))
             {
-                result.Add(new LogLineDto(ts, stream, m.Groups[2].Value));
+                result.Add(new LogLineDto(ts, stream, CleanText(m.Groups[2].Value)));
             }
             else
             {
-                result.Add(new LogLineDto(null, stream, line));
+                result.Add(new LogLineDto(null, stream, CleanText(line)));
             }
         }
         return result;
     }
 
     // ---------- helpers ----------
+
+    /// <summary>Remove códigos de cor ANSI e espaços nas pontas.</summary>
+    private static string CleanText(string s) => AnsiCodes().Replace(s, "").Trim();
+
+    /// <summary>
+    /// A linha é de nível benigno (rotina)? Erro explícito (ERROR/WARN/FATAL/PANIC)
+    /// tem prioridade e nunca é considerado benigno.
+    /// </summary>
+    private static bool IsBenignLevel(string text)
+    {
+        if (ErrorLevel().IsMatch(text)) return false;
+        return BenignLevel().IsMatch(text);
+    }
 
     private static bool Matches(string name, string matcher)
     {
