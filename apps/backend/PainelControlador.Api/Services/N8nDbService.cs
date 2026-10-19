@@ -224,7 +224,7 @@ public class N8nDbService : IN8nDbService
     internal static (string? Telefone, string? NomeFuncionario, string? Setor) ResolveContact(
         string sessionId, Dictionary<string, (string Name, string? Setor)> phoneMap)
     {
-        var digits = OnlyDigits(sessionId);
+        var digits = OnlyDigits(sessionId.Split(':')[0]);
         if (digits.Length < 8) return (null, null, null);
 
         foreach (var len in new[] { 11, 10, 8 })
