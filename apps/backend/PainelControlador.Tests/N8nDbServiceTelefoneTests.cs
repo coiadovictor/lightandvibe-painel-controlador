@@ -29,4 +29,25 @@ public class N8nDbServiceTelefoneTests
         Assert.Equal("Fulana", nome);
         Assert.Equal("TECNOLOGIA DA INFORMAÇÃO", setor);
     }
+
+    [Fact]
+    public void ResolveContact_UsaSoOCelularQuandoSessaoTemInicioDepoisDoDoisPontos()
+    {
+        var mapa = new Dictionary<string, (string Name, string? Setor)>
+        {
+            ["11992929439"] = ("Luis", "RECURSOS HUMANOS"),
+        };
+        var (telefone, nome, setor) = N8nDbService.ResolveContact("5511992929439:1792429617", mapa);
+        Assert.Equal("(11) 99292-9439", telefone);
+        Assert.Equal("Luis", nome);
+        Assert.Equal("RECURSOS HUMANOS", setor);
+    }
+
+    [Fact]
+    public void ResolveContact_FormataCelularSemCadastroQuandoSessaoTemInicio()
+    {
+        var (telefone, nome, _) = N8nDbService.ResolveContact("5512981993160:1792429617", new());
+        Assert.Equal("(12) 98199-3160", telefone);
+        Assert.Null(nome);
+    }
 }
