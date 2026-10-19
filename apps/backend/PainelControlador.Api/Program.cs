@@ -66,6 +66,10 @@ builder.Services.AddHttpClient<SupabaseRestClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
+var trocaOpts = builder.Configuration.GetSection(TrocaNumeroOptions.SectionName).Get<TrocaNumeroOptions>() ?? new TrocaNumeroOptions();
+builder.Services.AddSingleton(trocaOpts);
+builder.Services.AddHttpClient<ITrocaNumeroService, TrocaNumeroService>(c => c.Timeout = TimeSpan.FromSeconds(10));
+
 // --- JWT ---
 var jwtOpts = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? new JwtOptions();

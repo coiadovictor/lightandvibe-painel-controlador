@@ -37,6 +37,16 @@ public class SupabaseRestClient
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<string> RpcAsync(string funcao, object body, CancellationToken ct = default)
+    {
+        var json = JsonSerializer.Serialize(body, _opts);
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        var response = await _http.PostAsync($"rpc/{funcao}", content, ct);
+        response.EnsureSuccessStatusCode();
+        var texto = await response.Content.ReadAsStringAsync(ct);
+        return texto.Trim().Trim('"');
+    }
+
     public async Task<int> CountAsync(string table, string? filter = null, CancellationToken ct = default)
     {
         // limit=1 + Prefer: count=exact → PostgREST expõe Content-Range: 0-0/total sem trazer todos os dados.
