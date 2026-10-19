@@ -217,3 +217,12 @@ export interface ContainerLogs {
   container: string;
   lines: LogLine[];
 }
+
+export interface TrocaNumero {
+  id: number;
+  matricula: string;
+  nome: string | null;
+  celularAntigo: string;
+  celularNovo: string;
+  criadoEm: string;
+}

@@ -4,6 +4,7 @@ import { Users, KeyRound, ScrollText, Newspaper } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
+import { TrocasNumeroCard } from '@/components/TrocasNumeroCard';
 import type { DashboardSummary } from '@/types/api';
 
 interface LogStats {
@@ -100,6 +101,10 @@ export function DashboardPage() {
           icon={ScrollText}
           tone="blue"
         />
+      </div>
+
+      <div className="mt-8">
+        <TrocasNumeroCard />
       </div>
 
       <section className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
