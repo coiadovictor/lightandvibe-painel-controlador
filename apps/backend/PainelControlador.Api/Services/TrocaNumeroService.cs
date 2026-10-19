@@ -34,6 +34,11 @@ public class TrocaNumeroService : ITrocaNumeroService
         [JsonPropertyName("criado_em")] public DateTime CriadoEm { get; set; }
     }
 
+    private sealed class AcessoRow
+    {
+        public string? Celular { get; set; }
+    }
+
     private sealed class NomeRow
     {
         public string Funcionario { get; set; } = "";
@@ -57,9 +62,12 @@ public class TrocaNumeroService : ITrocaNumeroService
     public async Task<DecisaoTrocaResultado> AutorizarAsync(long id, string usuario, CancellationToken ct = default)
     {
         var troca = (await _supabase.GetAsync<TrocaRow>("acesso_troca_numero", $"id=eq.{id}", ct)).FirstOrDefault();
+        var celularVinculado = troca is null ? null
+            : (await _supabase.GetAsync<AcessoRow>("pag_funcionario_acesso", $"select=celular&matricula=eq.{troca.Matricula}", ct)).FirstOrDefault()?.Celular;
         var r = await _supabase.RpcAsync("autorizar_troca_numero", new { p_id = id, p_usuario = usuario }, ct);
         if (r != "ok") return new DecisaoTrocaResultado(false, false);
-        var invalidada = troca is not null && await InvalidarSessaoAntigaAsync(troca.CelularAntigo, ct);
+        var celularAnterior = celularVinculado ?? troca?.CelularAntigo;
+        var invalidada = celularAnterior is not null && await InvalidarSessaoAntigaAsync(celularAnterior, ct);
         return new DecisaoTrocaResultado(true, invalidada);
     }
 
@@ -81,7 +89,9 @@ public class TrocaNumeroService : ITrocaNumeroService
             using var req = new HttpRequestMessage(HttpMethod.Post, _opts.WebhookUrl);
             req.Headers.Add("x-troca-token", _opts.Token);
             req.Content = JsonContent.Create(new { celular_antigo = celularAntigo });
-            var resp = await _n8n.SendAsync(req, ct);
+            using var resp = await _n8n.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode)
+                _log.LogWarning("Webhook troca-autorizada devolveu {Status}", (int)resp.StatusCode);
             return resp.IsSuccessStatusCode;
         }
         catch (Exception ex)

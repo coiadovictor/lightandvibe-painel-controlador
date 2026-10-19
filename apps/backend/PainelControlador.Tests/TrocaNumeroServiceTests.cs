@@ -108,4 +108,36 @@ public class TrocaNumeroServiceTests
         Assert.EndsWith("rpc/recusar_troca_numero", sb.Requests[0].RequestUri!.AbsolutePath);
         Assert.Empty(n8n.Requests);
     }
+
+    [Fact]
+    public async Task Autorizar_InvalidaSessaoDoCelularVinculadoNoMomento_NaoDoGravadoNaSolicitacao()
+    {
+        var (svc, sb, n8n) = Montar();
+        n8n.Responder = _ => new HttpResponseMessage(HttpStatusCode.OK);
+        sb.Responder = req => req.RequestUri!.AbsolutePath switch
+        {
+            var p when p.EndsWith("rpc/autorizar_troca_numero") => Json("\"ok\""),
+            var p when p.EndsWith("pag_funcionario_acesso") => Json("""[{"celular":"atual@s.whatsapp.net"}]"""),
+            _ => Json(Troca5)
+        };
+
+        var r = await svc.AutorizarAsync(5, "rh.ana");
+
+        Assert.True(r.SessaoAntigaInvalidada);
+        Assert.Contains("atual@s.whatsapp.net", n8n.Bodies[0]);
+        Assert.DoesNotContain("antigo@s.whatsapp.net", n8n.Bodies[0]);
+    }
+
+    [Fact]
+    public async Task Autorizar_WebhookNao2xx_DevolveFlagFalsa()
+    {
+        var (svc, sb, n8n) = Montar();
+        sb.Responder = req => req.RequestUri!.AbsolutePath.EndsWith("rpc/autorizar_troca_numero") ? Json("\"ok\"") : req.RequestUri!.AbsolutePath.EndsWith("pag_funcionario_acesso") ? Json("""[{"celular":"antigo@s.whatsapp.net"}]""") : Json(Troca5);
+        n8n.Responder = _ => new HttpResponseMessage(HttpStatusCode.Unauthorized);
+
+        var r = await svc.AutorizarAsync(5, "rh.ana");
+
+        Assert.True(r.Ok);
+        Assert.False(r.SessaoAntigaInvalidada);
+    }
 }
