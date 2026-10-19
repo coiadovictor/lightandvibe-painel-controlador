@@ -22,4 +22,8 @@
     <PackageReference Include="Npgsql" Version="8.0.5" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="PainelControlador.Tests" />
+  </ItemGroup>
+
 </Project>
