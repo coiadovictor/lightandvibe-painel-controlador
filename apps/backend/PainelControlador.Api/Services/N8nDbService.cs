@@ -221,7 +221,7 @@ public class N8nDbService : IN8nDbService
     }
 
     // Extrai telefone, nome e setor a partir do session_id
-    private static (string? Telefone, string? NomeFuncionario, string? Setor) ResolveContact(
+    internal static (string? Telefone, string? NomeFuncionario, string? Setor) ResolveContact(
         string sessionId, Dictionary<string, (string Name, string? Setor)> phoneMap)
     {
         var digits = OnlyDigits(sessionId);
@@ -235,6 +235,13 @@ public class N8nDbService : IN8nDbService
                 return (FormatPhone(digits), info.Name, info.Setor);
         }
 
+        if (digits.Length == 12 && digits.StartsWith("55"))
+        {
+            var comNonoDigito = digits[2..4] + "9" + digits[4..];
+            if (phoneMap.TryGetValue(comNonoDigito, out var info))
+                return (FormatPhone(digits), info.Name, info.Setor);
+        }
+
         var formattedTel = digits.Length >= 10 ? FormatPhone(digits) : null;
         return (formattedTel, null, null);
     }
@@ -243,10 +250,10 @@ public class N8nDbService : IN8nDbService
         => new(s.Where(char.IsDigit).ToArray());
 
     // Formata número brasileiro: 55 (11) 9 8765-4321
-    private static string FormatPhone(string digits)
+    internal static string FormatPhone(string digits)
     {
         // Remove DDI 55 se presente
-        if (digits.Length == 13 && digits.StartsWith("55"))
+        if ((digits.Length == 13 || digits.Length == 12) && digits.StartsWith("55"))
             digits = digits[2..];
         return digits.Length == 11
             ? $"({digits[..2]}) {digits[2..7]}-{digits[7..]}"
