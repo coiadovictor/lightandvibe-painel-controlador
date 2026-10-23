@@ -43,7 +43,7 @@ public class N8nDbService : IN8nDbService
                 total = (long)(await cmd.ExecuteScalarAsync(ct) ?? 0L);
 
             await using (var cmd = new NpgsqlCommand(
-                "SELECT COUNT(DISTINCT session_id) FROM n8n_chat_histories WHERE message->>'type' != 'tool'", conn))
+                "SELECT COUNT(DISTINCT split_part(session_id, ':', 1)) FROM n8n_chat_histories WHERE message->>'type' != 'tool'", conn))
                 sessoes = (long)(await cmd.ExecuteScalarAsync(ct) ?? 0L);
 
             await using (var cmd = new NpgsqlCommand(
@@ -72,12 +72,12 @@ public class N8nDbService : IN8nDbService
 
             // Todas as sessões, ordenadas pela mais recente, excluindo tool
             await using (var cmd = new NpgsqlCommand(@"
-                SELECT session_id,
+                SELECT split_part(session_id, ':', 1) AS celular,
                        COUNT(*) AS total,
                        MAX(data) AS ultima
                 FROM n8n_chat_histories
                 WHERE message->>'type' != 'tool'
-                GROUP BY session_id
+                GROUP BY 1
                 ORDER BY MAX(data) DESC", conn))
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
             {
@@ -138,7 +138,7 @@ public class N8nDbService : IN8nDbService
                            COALESCE(message->>'content', '') AS conteudo,
                            data
                     FROM n8n_chat_histories
-                    WHERE session_id = @sessionId
+                    WHERE split_part(session_id, ':', 1) = @sessionId
                       AND message->>'type' != 'tool'
                     ORDER BY data DESC
                     LIMIT @limit";
