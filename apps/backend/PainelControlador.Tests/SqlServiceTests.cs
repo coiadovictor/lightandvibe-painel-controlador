@@ -46,6 +46,55 @@ public class SqlServiceTests
 
         Assert.Equal(new[] { "?column?", "?column?" }, r.Colunas);
         Assert.Single(r.Linhas);
+        Assert.Equal(2, r.Linhas[0].Count);
+        Assert.Equal(1, r.Linhas[0][0].GetInt32());
+        Assert.Equal(2, r.Linhas[0][1].GetInt32());
+    }
+
+    [Fact]
+    public void MontarResultado_LinhaViraListaDeValoresNaOrdemDasColunas()
+    {
+        var r = SqlService.MontarResultado("[{\"b\":1,\"a\":\"x\"}]", 1);
+
+        Assert.Equal(1, r.Linhas[0][0].GetInt32());
+        Assert.Equal("x", r.Linhas[0][1].GetString());
+    }
+
+    [Fact]
+    public void ExtrairMensagemErro_MessageQueNaoEhStringNaoQuebra()
+    {
+        Assert.Equal("{\"message\":5}", SqlService.ExtrairMensagemErro("{\"message\":5}"));
+    }
+
+    [Fact]
+    public async Task ConsultarAsync_5xxSemCorpoViraMensagemLegivel()
+    {
+        var handler = new FakeHttpHandler { Responder = _ => new HttpResponseMessage(HttpStatusCode.BadGateway) };
+        var svc = new SqlService(new FactoryFake { ["supabase-producao"] = new HttpClient(handler) { BaseAddress = new Uri("https://prod.local/rest/v1/") } });
+
+        var ex = await Assert.ThrowsAsync<SqlConsultaException>(() => svc.ConsultarAsync("producao", "select 1", CancellationToken.None));
+
+        Assert.Contains("502", ex.Message);
+    }
+
+    [Fact]
+    public async Task ConsultarAsync_200ComCorpoNaoJsonViraSqlConsultaException()
+    {
+        var handler = new FakeHttpHandler { Responder = _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("<html>proxy</html>") } };
+        var svc = new SqlService(new FactoryFake { ["supabase-producao"] = new HttpClient(handler) { BaseAddress = new Uri("https://prod.local/rest/v1/") } });
+
+        await Assert.ThrowsAsync<SqlConsultaException>(() => svc.ConsultarAsync("producao", "select 1", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ConsultarAsync_FalhaDeRedeViraSqlConsultaException()
+    {
+        var handler = new FakeHttpHandler { Responder = _ => throw new HttpRequestException("conexão recusada") };
+        var svc = new SqlService(new FactoryFake { ["supabase-producao"] = new HttpClient(handler) { BaseAddress = new Uri("https://prod.local/rest/v1/") } });
+
+        var ex = await Assert.ThrowsAsync<SqlConsultaException>(() => svc.ConsultarAsync("producao", "select 1", CancellationToken.None));
+
+        Assert.Equal("conexão recusada", ex.Message);
     }
 
     [Fact]

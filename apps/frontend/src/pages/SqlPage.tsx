@@ -10,7 +10,7 @@ type Ambiente = 'producao' | 'homolog';
 
 interface SqlResultado {
   colunas: string[];
-  linhas: Record<string, unknown>[];
+  linhas: unknown[][];
   truncado: boolean;
   duracaoMs: number;
 }
@@ -39,7 +39,7 @@ export function SqlPage() {
       setErro(null);
     },
     onError: (err: AxiosError<{ message?: string }>) => {
-      setErro(err.response?.data?.message ?? err.message);
+      setErro(err.response?.data?.message || err.message);
       setResultado(null);
     },
   });
@@ -72,6 +72,7 @@ export function SqlPage() {
           <button
             type="button"
             onClick={() => trocarAmbiente('producao')}
+            disabled={consulta.isPending}
             className={clsx('px-4 py-2 font-medium', ambiente === 'producao' ? 'border-amber-300 bg-amber-100 text-amber-900' : 'bg-white text-slate-600 hover:bg-slate-50')}
           >
             Produção
@@ -79,6 +80,7 @@ export function SqlPage() {
           <button
             type="button"
             onClick={() => trocarAmbiente('homolog')}
+            disabled={consulta.isPending}
             className={clsx('px-4 py-2 font-medium', ambiente === 'homolog' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50')}
           >
             Homolog
@@ -133,7 +135,7 @@ export function SqlPage() {
                     <tr key={i} className="hover:bg-slate-50">
                       {resultado.colunas.map((c, j) => (
                         <td key={`${c}-${j}`} className="whitespace-nowrap px-4 py-2 font-mono text-xs text-slate-700">
-                          {formatarCelula(linha[c])}
+                          {formatarCelula(linha[j])}
                         </td>
                       ))}
                     </tr>

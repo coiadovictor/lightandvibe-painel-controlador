@@ -39,8 +39,19 @@ public class SqlService(IHttpClientFactory factory) : ISqlService
         }
         var texto = await resposta.Content.ReadAsStringAsync(ct);
         if (!resposta.IsSuccessStatusCode)
+        {
+            if (string.IsNullOrWhiteSpace(texto))
+                throw new SqlConsultaException($"Supabase respondeu {(int)resposta.StatusCode} sem corpo.");
             throw new SqlConsultaException(ExtrairMensagemErro(texto));
-        return MontarResultado(texto, relogio.ElapsedMilliseconds);
+        }
+        try
+        {
+            return MontarResultado(texto, relogio.ElapsedMilliseconds);
+        }
+        catch (JsonException)
+        {
+            throw new SqlConsultaException("Resposta do Supabase não é JSON: " + (texto.Length > 200 ? texto[..200] : texto));
+        }
     }
 
     public static SqlResultado MontarResultado(string json, long duracaoMs)
@@ -50,7 +61,7 @@ public class SqlService(IHttpClientFactory factory) : ISqlService
         var colunas = todas.Count == 0
             ? []
             : todas[0].EnumerateObject().Select(p => p.Name).ToList();
-        var linhas = todas.Take(LimiteLinhas).Select(e => e.Clone()).ToList();
+        var linhas = todas.Take(LimiteLinhas).Select(e => e.EnumerateObject().Select(p => p.Value.Clone()).ToList()).ToList();
         return new SqlResultado(colunas, linhas, todas.Count > LimiteLinhas, duracaoMs);
     }
 
@@ -59,7 +70,7 @@ public class SqlService(IHttpClientFactory factory) : ISqlService
         try
         {
             using var doc = JsonDocument.Parse(corpo);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("message", out var msg))
+            if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("message", out var msg) && msg.ValueKind == JsonValueKind.String)
             {
                 var texto = msg.GetString() ?? "";
                 if (doc.RootElement.TryGetProperty("hint", out var hint) && hint.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(hint.GetString()))
