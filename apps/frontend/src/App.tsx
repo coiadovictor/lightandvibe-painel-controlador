@@ -8,6 +8,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { HollerithPage } from './pages/HollerithPage';
 import { IntegracoesPage } from './pages/IntegracoesPage';
 import { EnvironmentLogsPage } from './pages/EnvironmentLogsPage';
+import { SqlPage } from './pages/SqlPage';
 import { LoginPage } from './pages/LoginPage';
 import { useAuth } from './contexts/AuthContext';
 import type { ReactNode } from 'react';
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/hollerith" element={<HollerithPage />} />
         <Route path="/integracoes" element={<IntegracoesPage />} />
         <Route path="/ambiente-logs" element={<EnvironmentLogsPage />} />
+        <Route path="/sql" element={<SqlPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

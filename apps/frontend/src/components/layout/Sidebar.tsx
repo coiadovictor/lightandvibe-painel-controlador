@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, ScrollText, Users, Tags, FileText, GitMerge, Activity,
+  LayoutDashboard, ScrollText, Users, Tags, FileText, GitMerge, Activity, Database,
   ChevronDown, X, LogOut, UserCog,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -38,6 +38,7 @@ const items: NavItem[] = [
   { to: '/employees', label: 'Funcionário', icon: Users },
   { to: '/information-types', label: 'Tipo de Informação', icon: Tags },
   { to: '/integracoes', label: 'Integrações', icon: GitMerge },
+  { to: '/sql', label: 'SQL', icon: Database },
 ];
 
 const leafClasses = (isActive: boolean) =>
