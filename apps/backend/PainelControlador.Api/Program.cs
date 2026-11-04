@@ -66,6 +66,20 @@ builder.Services.AddHttpClient<SupabaseRestClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
+// --- Console SQL: um cliente por ambiente ---
+var hmlOpts = builder.Configuration.GetSection("HMLG_Supabase").Get<SupabaseOptions>() ?? new SupabaseOptions();
+void ClienteSupabase(string nome, SupabaseOptions o) => builder.Services.AddHttpClient(nome, client =>
+{
+    var url = string.IsNullOrWhiteSpace(o.Url) ? "https://supabase-nao-configurado.invalid" : o.Url.TrimEnd('/');
+    client.BaseAddress = new Uri(url + "/rest/v1/");
+    client.DefaultRequestHeaders.Add("apikey", o.Key);
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {o.Key}");
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+ClienteSupabase("supabase-producao", sbOpts);
+ClienteSupabase("supabase-homolog", hmlOpts);
+builder.Services.AddScoped<ISqlService, SqlService>();
+
 var trocaOpts = builder.Configuration.GetSection(TrocaNumeroOptions.SectionName).Get<TrocaNumeroOptions>() ?? new TrocaNumeroOptions();
 builder.Services.AddSingleton(trocaOpts);
 builder.Services.AddHttpClient<ITrocaNumeroService, TrocaNumeroService>(c => c.Timeout = TimeSpan.FromSeconds(10));
